@@ -9,9 +9,9 @@ export type ReadyState = { status: "ready"; payload: DisplayPayload; receivedAt:
 export type DisplayDataState = { status: "loading" } | { status: "unavailable" } | ReadyState;
 
 function readSnapshot(): ReadyState | null {
-  const raw = localStorage.getItem(CACHE_KEY);
-  if (!raw) return null;
   try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
     const input = JSON.parse(raw) as { payload?: unknown; receivedAt?: unknown };
     const payload = displayPayloadSchema.parse(input.payload);
     const receivedAt = typeof input.receivedAt === "string" && Number.isFinite(Date.parse(input.receivedAt))
@@ -19,13 +19,17 @@ function readSnapshot(): ReadyState | null {
       : new Date(payload.generatedAt);
     return { status: "ready", payload, receivedAt, stale: true };
   } catch {
-    localStorage.removeItem(CACHE_KEY);
+    try { localStorage.removeItem(CACHE_KEY); } catch { /* persistence is best effort */ }
     return null;
   }
 }
 
 function writeSnapshot(payload: DisplayPayload, receivedAt: Date) {
-  localStorage.setItem(CACHE_KEY, JSON.stringify({ payload, receivedAt: receivedAt.toISOString() }));
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ payload, receivedAt: receivedAt.toISOString() }));
+  } catch {
+    // A valid live payload must remain usable when kiosk storage is blocked or full.
+  }
 }
 
 export function useDisplayData(): DisplayDataState {
@@ -41,10 +45,20 @@ export function useDisplayData(): DisplayDataState {
       const controller = new AbortController();
       controllers.add(controller);
       const timeout = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT_MS);
+      let maintenanceCode = "DISPLAY_FETCH_FAILED";
       try {
         const response = await fetch("/api/today", { signal: controller.signal });
-        if (!response.ok) throw new Error(`DISPLAY_FETCH_${response.status}`);
-        const payload = displayPayloadSchema.parse(await response.json());
+        if (!response.ok) {
+          maintenanceCode = `DISPLAY_FETCH_${response.status}`;
+          throw new Error(maintenanceCode);
+        }
+        let payload: DisplayPayload;
+        try {
+          payload = displayPayloadSchema.parse(await response.json());
+        } catch {
+          maintenanceCode = "DISPLAY_RESPONSE_INVALID";
+          throw new Error(maintenanceCode);
+        }
         if (!active) return;
         const receivedAt = new Date();
         const ready: ReadyState = {
@@ -56,9 +70,9 @@ export function useDisplayData(): DisplayDataState {
         writeSnapshot(payload, receivedAt);
         lastReady.current = ready;
         setState(ready);
-      } catch (error) {
+      } catch {
         if (!active) return;
-        console.warn("Family Display data unavailable", error instanceof Error ? error.message : "UNKNOWN");
+        console.warn("Family Display data unavailable", maintenanceCode);
         const fallback = lastReady.current ?? readSnapshot();
         if (fallback) {
           const stale = { ...fallback, stale: true } satisfies ReadyState;

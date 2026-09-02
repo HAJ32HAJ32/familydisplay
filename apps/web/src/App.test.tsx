@@ -20,6 +20,7 @@ describe("Family Display", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it("moves from its dark loading shell to the complete display", async () => {
@@ -153,6 +154,29 @@ describe("Family Display", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Trying again…");
     expect(screen.queryByText("service detail")).not.toBeInTheDocument();
     expect(localStorage.getItem("family-display:last-good:v1")).toBeNull();
+  });
+
+  it("keeps a valid live response visible when browser persistence is unavailable", async () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+      throw new DOMException("Storage blocked", "SecurityError");
+    });
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Calendar temporarily unavailable" })).not.toBeInTheDocument();
+  });
+
+  it("logs a maintenance code without raw response details", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.mocked(fetch).mockResolvedValueOnce(new Response("private-household-detail", { status: 200 }));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Calendar temporarily unavailable" })).toBeVisible();
+    expect(warn).toHaveBeenCalledWith("Family Display data unavailable", "DISPLAY_RESPONSE_INVALID");
+    expect(JSON.stringify(warn.mock.calls)).not.toContain("private-household-detail");
   });
 
   it("starts and cleans up daily browser recovery scheduling", () => {
