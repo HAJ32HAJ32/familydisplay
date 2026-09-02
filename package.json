@@ -1,0 +1,13 @@
+{
+  "name": "family-display",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "npm run dev --workspace @family-display/web",
+    "build": "npm run build --workspace @family-display/web",
+    "test": "npm run test --workspace @family-display/web",
+    "typecheck": "npm run typecheck --workspace @family-display/web",
+    "lint": "npm run lint --workspace @family-display/web"
+  }
+}
