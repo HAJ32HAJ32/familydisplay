@@ -8,11 +8,12 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @family-display/contract && npm run build -w @family-display/api",
+    "build": "npm run build -w @family-display/contract && npm run build -w @family-display/web && npm run build -w @family-display/api",
     "dev": "npm run dev -w @family-display/api",
-    "lint": "eslint .",
-    "typecheck": "tsc -b --pretty false",
-    "test": "npm run build -w @family-display/contract && vitest run"
+    "dev:web": "npm run dev -w @family-display/web",
+    "lint": "eslint . && npm run lint -w @family-display/web",
+    "typecheck": "npm run typecheck -w @family-display/contract && npm run typecheck -w @family-display/api && npm run typecheck -w @family-display/web",
+    "test": "npm run build -w @family-display/contract && vitest run packages/contract/test apps/api/test && npm run test -w @family-display/web"
   },
   "devDependencies": {
     "@types/luxon": "3.7.5",
