@@ -1,0 +1,26 @@
+{
+  "name": "family-display",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @family-display/contract && npm run build -w @family-display/api",
+    "dev": "npm run dev -w @family-display/api",
+    "lint": "eslint .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "npm run build -w @family-display/contract && vitest run"
+  },
+  "devDependencies": {
+    "@types/luxon": "3.7.5",
+    "@types/node": "26.4.1",
+    "@typescript-eslint/parser": "^8.69.0",
+    "eslint": "10.9.1",
+    "tsx": "4.23.13",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  }
+}
