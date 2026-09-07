@@ -119,7 +119,7 @@ describe("Family Display", () => {
     expect(screen.getByRole("heading", { name: "Calendar temporarily unavailable" })).toBeVisible();
   });
 
-  it("renders event semantics and all five groups without relying on colour", async () => {
+  it("renders event semantics and all six groups without relying on colour", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
 
@@ -128,7 +128,11 @@ describe("Family Display", () => {
     expect(screen.getByLabelText("Rafe: Nursery drop-off, at Nursery")).toHaveTextContent("08:30");
     expect(screen.getByLabelText("H: Bins out")).toBeVisible();
     expect(screen.getByLabelText("Chantele: Appointment, at Clinic")).toBeVisible();
-    expect(screen.getAllByText("Nothing planned")).toHaveLength(4);
+    const household = screen.getByLabelText("Household: Cleaner");
+    expect(household).toBeVisible();
+    expect(household).toHaveTextContent("Household");
+    expect(household).toHaveClass("event--household");
+    expect(screen.getAllByText("Nothing planned")).toHaveLength(3);
     expect(screen.getByLabelText(/Maximum 19 degrees Celsius/)).toBeVisible();
     expect(screen.queryByLabelText(/Maximum 21 degrees Celsius/)).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();

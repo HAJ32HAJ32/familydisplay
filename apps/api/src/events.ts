@@ -4,7 +4,16 @@ import type { EventOccurrence } from "@family-display/contract";
 import type { CalendarMapping } from "./config.js";
 import { TIMEZONE } from "./date-window.js";
 
-export type RawGoogleEvent = { id?: string | null; recurringEventId?: string | null; originalStartTime?: { date?: string | null; dateTime?: string | null }; summary?: string | null; location?: string | null; status?: string | null; start?: { date?: string | null; dateTime?: string | null }; end?: { date?: string | null; dateTime?: string | null }; attendees?: Array<{ self?: boolean | null; responseStatus?: string | null; email?: string | null }> | null; description?: string | null };
+export type RawGoogleEvent = { id?: string | null; recurringEventId?: string | null; originalStartTime?: { date?: string | null; dateTime?: string | null }; colorId?: string | null; summary?: string | null; location?: string | null; status?: string | null; start?: { date?: string | null; dateTime?: string | null }; end?: { date?: string | null; dateTime?: string | null }; attendees?: Array<{ self?: boolean | null; responseStatus?: string | null; email?: string | null }> | null; description?: string | null };
+const groupByGoogleColorId = {
+  "1": "h-and-chantele",
+  "2": "all",
+  "3": "rafe",
+  "5": "household",
+  "6": "household",
+  "8": "h",
+  "11": "chantele"
+} as const satisfies Record<string, EventOccurrence["group"]>;
 const localMidnight = (date: string) => DateTime.fromISO(date, { zone: TIMEZONE }).startOf("day").toISO({ suppressMilliseconds: true })!;
 export function normalizeGoogleEvent(mapping: CalendarMapping, raw: RawGoogleEvent, salt: string): EventOccurrence | null {
   if (raw.status === "cancelled" || raw.attendees?.some((attendee) => attendee.self && attendee.responseStatus === "declined")) return null;
@@ -14,7 +23,8 @@ export function normalizeGoogleEvent(mapping: CalendarMapping, raw: RawGoogleEve
   if (!raw.id || !start || !end || Date.parse(end) <= Date.parse(start)) return null;
   const sourceOccurrence = raw.originalStartTime?.dateTime ?? raw.originalStartTime?.date ?? start;
   const id = `evt_${createHash("sha256").update(`${salt}\0${mapping.calendarId}\0${raw.id}\0${sourceOccurrence}`).digest("hex").slice(0, 20)}`;
-  return { id, title: raw.summary?.trim().slice(0, 200) || "Untitled event", start, end, allDay, group: mapping.group, location: raw.location?.trim().slice(0, 300) ?? "" };
+  const group = groupByGoogleColorId[raw.colorId as keyof typeof groupByGoogleColorId] ?? mapping.defaultGroup;
+  return { id, title: raw.summary?.trim().slice(0, 200) || "Untitled event", start, end, allDay, group, location: raw.location?.trim().slice(0, 300) ?? "" };
 }
 export function sortEvents(events: EventOccurrence[]) {
   return [...events].sort((a, b) => Number(b.allDay) - Number(a.allDay) || Date.parse(a.start) - Date.parse(b.start) || Date.parse(a.end) - Date.parse(b.end) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));

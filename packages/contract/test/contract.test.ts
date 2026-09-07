@@ -15,6 +15,10 @@ const valid = {
 describe("displayPayloadSchema", () => {
   it("accepts the checked-in canonical fixture", () => expect(displayPayloadSchema.parse(fixture)).toEqual(fixture));
   it("accepts the canonical shape", () => expect(displayPayloadSchema.parse(valid)).toEqual(valid));
+  it("accepts the household group", () => {
+    const withHousehold = { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "household" }] } };
+    expect(displayPayloadSchema.parse(withHousehold)).toEqual(withHousehold);
+  });
   it.each([
     ["invalid group", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "family" }] } }],
     ["timestamp without offset", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, start: "2026-08-27T08:00:00" }] } }],

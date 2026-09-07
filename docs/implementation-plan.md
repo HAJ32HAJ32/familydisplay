@@ -2,7 +2,7 @@
 
 ## 1. Purpose and delivery boundary
 
-Build a read-only, always-on household display hosted on the VPS and rendered by Chromium on the Raspberry Pi. The application shows yesterday, today, and the next six days, combining five shared Google Calendar groups with weather and a server-generated outfit suggestion.
+Build a read-only, always-on household display hosted on the VPS and rendered by Chromium on the Raspberry Pi. The application shows yesterday, today, and the next six days, combining two source Google Calendars with event-colour-derived household groups, weather, and a server-generated outfit suggestion.
 
 This plan covers the first useful production release: the web application and fixture from Phase 1, live calendar integration from Phase 2, the TV-oriented view from Phase 3, weather from Phase 4, and browser/server resilience from Phase 5.
 
@@ -53,7 +53,7 @@ Suggested initial structure:
 ### Server owns
 
 - Google OAuth credentials and refresh token.
-- Google Calendar IDs and their mapping to the five public group values.
+- The Family and BAES Google Calendar IDs, source defaults, and event-colour mapping to the six public group values.
 - Open-Meteo location and requests.
 - Europe/London date boundaries, daylight-saving offsets, rolling-window calculation, weekday labels, `isToday`, sorting, filtering, and outfit rules.
 - Expansion of recurring calendar events into occurrences.
@@ -239,8 +239,9 @@ The only accepted group values and their presentation tokens are:
 - `rafe`: green; Rafe.
 - `h`: grey; H.
 - `chantele`: pink/red; Chantele.
+- `household`: tangerine; household events such as the cleaner.
 
-The backend maps configured Google Calendar IDs to these values. Unknown or unmapped source calendars must fail configuration/startup rather than silently assigning a group. The response never exposes the human-readable member description, email address, or calendar ID.
+Configure exactly two source calendars. `GOOGLE_CALENDAR_FAMILY` defaults events to `all`; `GOOGLE_CALENDAR_BAES` defaults events to `h-and-chantele`. For either source, recognised Google event `colorId` values override that default: lavender (`1`) → `h-and-chantele`, sage (`2`) → `all`, grape (`3`) → `rafe`, graphite (`8`) → `h`, tomato (`11`) → `chantele`, and banana/tangerine (`5`/`6`) → `household`. Missing or unsupported colour IDs retain the source default. Duplicate or missing source calendar IDs fail configuration/startup. The response never exposes colour IDs, human-readable member descriptions, email addresses, or calendar IDs.
 
 Colour cannot be the only group cue. Each event row must also expose a short visible label or shape marker, and an accessible label containing the group name.
 
@@ -409,7 +410,8 @@ type Group =
   | "all"
   | "rafe"
   | "h"
-  | "chantele";
+  | "chantele"
+  | "household";
 
 type Outfit =
   | "tshirt"
@@ -675,7 +677,7 @@ Opaque event IDs should be stable for a source occurrence without revealing raw 
 - Initial loading to success.
 - Yesterday/today/future hierarchy and exact day count.
 - Empty day copy.
-- All five group markers and non-colour labels.
+- All six group markers and non-colour labels.
 - All-day versus timed event rendering.
 - Today weather/outfit rendering and `weather: null` omission.
 - Poll success atomically replaces data.
@@ -703,13 +705,13 @@ Opaque event IDs should be stable for a source occurrence without revealing raw 
 
 - One shared runtime schema validates the fixture, server output, and frontend input.
 - The payload always contains separate `yesterday` and exactly seven ordered `days` beginning with server-defined today.
-- The browser receives only the five fixed group values, never raw Google calendar IDs, emails, OAuth material, coordinates, attendee data, or descriptions.
+- The browser receives only the six fixed group values, never raw Google colour IDs, calendar IDs, emails, OAuth material, coordinates, attendee data, or descriptions.
 - All timestamps include offsets and all day/date decisions use Europe/London server-side.
 - Every current day includes `weather` and `meal`; either may be `null`, and `meal` is always `null` in this release.
 
 ### Calendar behaviour
 
-- All five configured calendars are read with `calendar.readonly` and recurring instances are expanded.
+- The Family and BAES calendars are read with `calendar.readonly`, recurring instances are expanded, and event colour IDs are resolved through the fixed group mapping with source-default fallback.
 - Cancelled and self-declined events do not render.
 - Events are assigned to every overlapping display date and sorted all-day first, then chronologically with deterministic ties.
 - Empty days render normally rather than failing or disappearing.

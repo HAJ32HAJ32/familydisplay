@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const groups = ["h-and-chantele", "all", "rafe", "h", "chantele"] as const;
+export const groups = ["h-and-chantele", "all", "rafe", "h", "chantele", "household"] as const;
 export const outfits = ["tshirt", "long-sleeve", "hoodie", "coat", "raincoat"] as const;
 export const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 

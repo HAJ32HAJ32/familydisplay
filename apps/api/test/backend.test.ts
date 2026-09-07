@@ -15,10 +15,9 @@ import { OpenMeteoProvider } from "../src/open-meteo-provider.js";
 const validEnv = {
   APP_TIMEZONE: "Europe/London", DISPLAY_LATITUDE: "51", DISPLAY_LONGITUDE: "-0.1",
   GOOGLE_CLIENT_ID: "client", GOOGLE_CLIENT_SECRET: "secret", GOOGLE_REFRESH_TOKEN: "refresh",
-  GOOGLE_CALENDAR_H_AND_CHANTELE: "a", GOOGLE_CALENDAR_ALL: "b", GOOGLE_CALENDAR_RAFE: "c",
-  GOOGLE_CALENDAR_H: "d", GOOGLE_CALENDAR_CHANTELE: "e", EVENT_ID_SALT: "salt"
+  GOOGLE_CALENDAR_FAMILY: "family-calendar", GOOGLE_CALENDAR_BAES: "baes-calendar", EVENT_ID_SALT: "salt"
 };
-const mapping = { calendarId: "private-calendar", group: "rafe" as const };
+const mapping = { calendarId: "private-calendar", defaultGroup: "rafe" as const };
 const occurrence = { id: "evt_1", title: "Lunch", start: "2026-08-27T12:00:00+01:00", end: "2026-08-27T13:00:00+01:00", allDay: false, group: "all" as const, location: "" };
 const clock = () => new Date("2026-08-27T12:00:00Z");
 
@@ -35,9 +34,12 @@ describe("date window", () => {
 });
 
 describe("configuration", () => {
-  it("creates five mappings and defaults to loopback", () => {
+  it("creates the two source-calendar mappings with their default groups", () => {
     const config = parseConfig(validEnv);
-    expect(config.calendars).toHaveLength(5);
+    expect(config.calendars).toEqual([
+      { calendarId: "family-calendar", defaultGroup: "all" },
+      { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" }
+    ]);
     expect(config.host).toBe("127.0.0.1");
   });
   it.each(["100.64.0.1", "100.127.255.254"])("accepts a Tailscale IPv4 bind address", (host) => {
@@ -50,18 +52,44 @@ describe("configuration", () => {
     { ...validEnv, GOOGLE_CLIENT_SECRET: "" },
     { ...validEnv, GOOGLE_CLIENT_SECRET: "   " },
     { ...validEnv, DISPLAY_LATITUDE: "" },
-    { ...validEnv, GOOGLE_CALENDAR_H: "a" },
+    { ...validEnv, GOOGLE_CALENDAR_FAMILY: undefined },
+    { ...validEnv, GOOGLE_CALENDAR_BAES: "   " },
+    { ...validEnv, GOOGLE_CALENDAR_BAES: "family-calendar" },
     { ...validEnv, APP_TIMEZONE: "UTC" },
     { ...validEnv, DISPLAY_LATITUDE: "91" }
   ])("rejects invalid or duplicate values without exposing them", (env) => expect(() => parseConfig(env)).toThrow("Invalid server configuration"));
 });
 
 describe("event processing", () => {
+  const timedRawEvent = { id: "provider-id", summary: "Event", start: { dateTime: "2026-08-27T08:30:00+01:00" }, end: { dateTime: "2026-08-27T09:00:00+01:00" } };
+
+  it.each([
+    ["Family", "1", "h-and-chantele", { calendarId: "family-calendar", defaultGroup: "all" as const }],
+    ["BAES", "2", "all", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
+    ["Family", "3", "rafe", { calendarId: "family-calendar", defaultGroup: "all" as const }],
+    ["BAES", "8", "h", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
+    ["Family", "11", "chantele", { calendarId: "family-calendar", defaultGroup: "all" as const }],
+    ["BAES", "5", "household", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
+    ["Family", "6", "household", { calendarId: "family-calendar", defaultGroup: "all" as const }]
+  ] as const)("maps %s Google event colour %s to %s", (_sourceName, colorId, expected, source) => {
+    expect(normalizeGoogleEvent(source, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
+  });
+
+  it.each([
+    ["Family missing colour", { calendarId: "family-calendar", defaultGroup: "all" as const }, undefined, "all"],
+    ["Family unsupported colour", { calendarId: "family-calendar", defaultGroup: "all" as const }, "9", "all"],
+    ["BAES missing colour", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }, undefined, "h-and-chantele"],
+    ["BAES unsupported colour", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }, "10", "h-and-chantele"]
+  ])("uses the source default for %s", (_name, source, colorId, expected) => {
+    expect(normalizeGoogleEvent(source, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
+  });
+
   it("normalizes safely and creates an opaque ID", () => {
-    const result = normalizeGoogleEvent(mapping, { id: "provider-id", summary: "  Nursery  ", location: " Hall ", status: "confirmed", start: { dateTime: "2026-08-27T08:30:00+01:00" }, end: { dateTime: "2026-08-27T09:00:00+01:00" }, description: "private", attendees: [{ email: "secret@example.com", responseStatus: "accepted", self: true }] }, "salt");
-    expect(result).toMatchObject({ title: "Nursery", location: "Hall", group: "rafe", allDay: false });
+    const result = normalizeGoogleEvent(mapping, { id: "provider-id", colorId: "6", summary: "  Nursery  ", location: " Hall ", status: "confirmed", start: { dateTime: "2026-08-27T08:30:00+01:00" }, end: { dateTime: "2026-08-27T09:00:00+01:00" }, description: "private", attendees: [{ email: "secret@example.com", responseStatus: "accepted", self: true }] }, "salt");
+    expect(result).toMatchObject({ title: "Nursery", location: "Hall", group: "household", allDay: false });
     expect(result?.id).toMatch(/^evt_[a-f0-9]{20}$/);
     expect(JSON.stringify(result)).not.toContain("private-calendar");
+    expect(Object.keys(result!)).toEqual(["id", "title", "start", "end", "allDay", "group", "location"]);
   });
   it("drops cancelled and self-declined events", () => {
     expect(normalizeGoogleEvent(mapping, { id: "1", status: "cancelled" }, "salt")).toBeNull();
