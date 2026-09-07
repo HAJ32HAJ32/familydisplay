@@ -1,6 +1,6 @@
 # Family Display
 
-A read-only household kiosk showing yesterday, today, and the next six days from five Google Calendars, with Open-Meteo weather and a server-generated outfit suggestion. The Fastify API serves the production React build and `/api/*` from one origin.
+A read-only household kiosk showing yesterday, today, and the next six days from two source Google Calendars, with Open-Meteo weather and a server-generated outfit suggestion. The Fastify API serves the production React build and `/api/*` from one origin.
 
 ## Requirements
 
@@ -13,7 +13,7 @@ A read-only household kiosk showing yesterday, today, and the next six days from
 
 Copy `.env.example` to a server-only environment file and replace every placeholder. Do not commit it. `HOST` defaults to loopback and may only be set to `127.0.0.1` or a Tailscale IPv4 address in `100.64.0.0/10`; wildcard, LAN, hostname, and public binds fail startup.
 
-The five `GOOGLE_CALENDAR_*` values map calendar IDs to the fixed household display groups. `APP_TIMEZONE` must remain `Europe/London`. Latitude, longitude, OAuth material, calendar IDs, and `EVENT_ID_SALT` stay on the server and are never returned to the browser.
+Configure exactly two source calendars: `GOOGLE_CALENDAR_FAMILY` and `GOOGLE_CALENDAR_BAES`. Event-level Google colour IDs determine the display group: lavender (`1`) → H + Chantele, sage (`2`) → All, grape (`3`) → Rafe, graphite (`8`) → H, tomato (`11`) → Chantele, and banana/tangerine (`5`/`6`) → Household. Missing or unsupported colours fall back to All for Family and H + Chantele for BAES. `APP_TIMEZONE` must remain `Europe/London`. Latitude, longitude, OAuth material, calendar IDs, and `EVENT_ID_SALT` stay on the server and are never returned to the browser.
 
 The Google OAuth grant must use only:
 

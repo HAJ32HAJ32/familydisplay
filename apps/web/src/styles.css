@@ -134,6 +134,7 @@ h2 { margin: 0; font-size: clamp(1.25rem, 1.65vw, 2rem); line-height: 1.15; }
 .event--rafe .event__marker { background: #4ade80; }
 .event--h .event__marker { background: #cbd5e1; }
 .event--chantele .event__marker { background: #fb7185; }
+.event--household .event__marker { background: #f6bf26; }
 .event__time { font-variant-numeric: tabular-nums; color: #e2e8f0; font-weight: 700; }
 .event__body { display: flex; min-width: 0; gap: .5rem; }
 .event__title, .event__location { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

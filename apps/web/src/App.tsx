@@ -9,6 +9,7 @@ const groupLabels: Record<EventOccurrence["group"], { short: string; accessible:
   rafe: { short: "Rafe", accessible: "Rafe" },
   h: { short: "H", accessible: "H" },
   chantele: { short: "Chantele", accessible: "Chantele" },
+  household: { short: "Household", accessible: "Household" },
 };
 
 function longDate(date: string, timezone: string) {

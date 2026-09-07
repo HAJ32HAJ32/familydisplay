@@ -19,7 +19,7 @@ export const payload = {
     },
     { date: "2026-08-28", weekday: "Fri", isToday: false, weather: { tempMaxC: 21, precipitationChance: 5, outfit: "tshirt" }, events: [{ id: "evt_hc", title: "Date night", start: "2026-08-28T19:00:00+01:00", end: "2026-08-28T21:00:00+01:00", allDay: false, group: "h-and-chantele", location: "" }], meal: null },
     { date: "2026-08-29", weekday: "Sat", isToday: false, weather: null, events: [{ id: "evt_c", title: "Appointment", start: "2026-08-29T11:00:00+01:00", end: "2026-08-29T11:30:00+01:00", allDay: false, group: "chantele", location: "Clinic" }], meal: null },
-    { date: "2026-08-30", weekday: "Sun", isToday: false, weather: null, events: [], meal: null },
+    { date: "2026-08-30", weekday: "Sun", isToday: false, weather: null, events: [{ id: "evt_household", title: "Cleaner", start: "2026-08-30T10:00:00+01:00", end: "2026-08-30T12:00:00+01:00", allDay: false, group: "household", location: "" }], meal: null },
     { date: "2026-08-31", weekday: "Mon", isToday: false, weather: null, events: [], meal: null },
     { date: "2026-09-01", weekday: "Tue", isToday: false, weather: null, events: [], meal: null },
     { date: "2026-09-02", weekday: "Wed", isToday: false, weather: null, events: [], meal: null },
