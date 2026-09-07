@@ -128,6 +128,21 @@ describe("provider adapters", () => {
     expect(events).toHaveLength(2); expect(list).toHaveBeenCalledTimes(2);
     expect(list.mock.calls[0]?.[0]).toMatchObject({ calendarId: "private-calendar", singleEvents: true, timeZone: "Europe/London", timeMin: "2026-08-26T00:00:00+01:00", timeMax: "2026-09-03T00:00:00+01:00" });
   });
+  it("times out a non-settling Google request and aborts it", async () => {
+    let signal: AbortSignal | undefined;
+    const list = vi.fn((_args: unknown, options?: { signal?: AbortSignal }) => {
+      signal = options?.signal;
+      return new Promise<never>(() => undefined);
+    });
+    const provider = new GoogleCalendarProvider([mapping], "salt", { events: { list } }, 20);
+    const outcome = Promise.race([
+      provider.load("2026-08-26T00:00:00+01:00", "2026-09-03T00:00:00+01:00"),
+      new Promise<string>((resolve) => setTimeout(() => resolve("still pending"), 100))
+    ]);
+
+    await expect(outcome).rejects.toThrow("Calendar data unavailable");
+    expect(signal?.aborted).toBe(true);
+  });
   it("normalizes Open-Meteo daily arrays by date", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44] } }), { status: 200 }));
     const weather = await new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02");
