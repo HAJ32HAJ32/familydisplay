@@ -22,10 +22,10 @@ export class DisplayService {
   async getToday(): Promise<{ payload: DisplayPayload; stale: boolean }> {
     const now = (this.options.clock ?? (() => new Date()))(); const window = createDateWindow(now);
     let calendarResult;
-    try { calendarResult = await this.calendarCache.get(() => this.calendars.load(window.from.toISO()!, window.to.toISO()!)); }
+    try { calendarResult = await this.calendarCache.get(() => this.calendars.load(window.from.toISO()!, window.to.toISO()!), `${window.from.toISO()}|${window.to.toISO()}`); }
     catch { if (this.lastPayload) return { payload: this.lastPayload, stale: true }; throw new DisplayDataUnavailableError(); }
     let weatherResult: { value: Map<string, RawWeather>; stale: boolean };
-    try { weatherResult = await this.weatherCache.get(() => this.weather.load(window.dates[0], window.dates[6])); }
+    try { weatherResult = await this.weatherCache.get(() => this.weather.load(window.dates[0], window.dates[6]), `${window.dates[0]}|${window.dates[6]}`); }
     catch { weatherResult = { value: new Map(), stale: true }; }
     const grouped = groupEventsByDate(calendarResult.value, [window.yesterday, ...window.dates]);
     const payload = displayPayloadSchema.parse({ generatedAt: londonTimestamp(now), timezone: "Europe/London",

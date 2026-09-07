@@ -1,13 +1,17 @@
 export type CacheResult<T> = { value: T; stale: boolean };
+type CacheEntry<T> = { key: string; value?: T; loadedAt: number; pending: Promise<CacheResult<T>> | undefined };
 export class RefreshCache<T> {
-  private value?: T; private loadedAt = 0; private pending: Promise<CacheResult<T>> | undefined;
+  private entry?: CacheEntry<T>;
   constructor(private readonly ttlMs: number, private readonly now: () => number = Date.now) {}
-  async get(loader: () => Promise<T>): Promise<CacheResult<T>> {
-    if (this.value !== undefined && this.now() - this.loadedAt < this.ttlMs) return { value: this.value, stale: false };
-    if (this.pending) return this.pending;
-    this.pending = loader().then((value) => { this.value = value; this.loadedAt = this.now(); return { value, stale: false }; })
-      .catch((error: unknown) => { if (this.value !== undefined) return { value: this.value, stale: true }; throw error; })
-      .finally(() => { this.pending = undefined; });
-    return this.pending;
+  async get(loader: () => Promise<T>, key = "default"): Promise<CacheResult<T>> {
+    const entry = this.entry?.key === key ? this.entry : { key, loadedAt: 0, pending: undefined };
+    this.entry = entry;
+    if (entry.value !== undefined && this.now() - entry.loadedAt < this.ttlMs) return { value: entry.value, stale: false };
+    if (entry.pending) return entry.pending;
+    const pending = loader().then((value) => { entry.value = value; entry.loadedAt = this.now(); return { value, stale: false }; })
+      .catch((error: unknown) => { if (entry.value !== undefined) return { value: entry.value, stale: true }; throw error; })
+      .finally(() => { if (entry.pending === pending) entry.pending = undefined; });
+    entry.pending = pending;
+    return pending;
   }
 }

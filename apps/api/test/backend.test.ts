@@ -98,6 +98,26 @@ describe("display service", () => {
     const service = new DisplayService({ load: async () => { if (fail) throw new Error("private"); return [occurrence]; } }, { load: async () => new Map() }, { clock, calendarTtlMs: 0 });
     const first = await service.getToday(); fail = true; expect(await service.getToday()).toEqual({ payload: first.payload, stale: true });
   });
+  it("refreshes both provider caches when the London date changes", async () => {
+    let current = new Date("2026-08-27T22:59:00Z");
+    let calendarCalls = 0;
+    let weatherCalls = 0;
+    const horizonEvent = { ...occurrence, id: "evt_horizon", start: "2026-09-03T12:00:00+01:00", end: "2026-09-03T13:00:00+01:00" };
+    const service = new DisplayService(
+      { load: async () => { calendarCalls += 1; return calendarCalls === 1 ? [] : [horizonEvent]; } },
+      { load: async () => { weatherCalls += 1; return new Map(); } },
+      { clock: () => current, calendarTtlMs: 300_000, weatherTtlMs: 1_800_000 }
+    );
+
+    await service.getToday();
+    current = new Date("2026-08-27T23:01:00Z");
+    const nextDay = await service.getToday();
+
+    expect(calendarCalls).toBe(2);
+    expect(weatherCalls).toBe(2);
+    expect(nextDay.payload.days[6]).toMatchObject({ date: "2026-09-03", events: [horizonEvent] });
+    expect(nextDay.stale).toBe(false);
+  });
 });
 
 describe("provider adapters", () => {
