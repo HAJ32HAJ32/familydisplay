@@ -43,7 +43,7 @@ describe("configuration", () => {
   it.each(["100.64.0.1", "100.127.255.254"])("accepts a Tailscale IPv4 bind address", (host) => {
     expect(parseConfig({ ...validEnv, HOST: host }).host).toBe(host);
   });
-  it.each(["0.0.0.0", "192.168.1.5", "8.8.8.8", "localhost", "100.63.255.255", "100.128.0.0"])("rejects unsafe bind host %s", (host) => {
+  it.each(["0.0.0.0", "192.168.1.5", "8.8.8.8", "localhost", "100.63.255.255", "100.128.0.0", "100.064.0.1", "100.64.0.1:3000", "100.64.0.1.example"])("rejects unsafe bind host %s", (host) => {
     expect(() => parseConfig({ ...validEnv, HOST: host })).toThrow("Invalid server configuration");
   });
   it.each([

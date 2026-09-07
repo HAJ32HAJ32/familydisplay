@@ -1,13 +1,12 @@
+import { isIP } from "node:net";
 import { z } from "zod";
 import type { Group } from "@family-display/contract";
 
 const requiredText = z.string().refine((value) => value.trim().length > 0);
 const isPrivateBindHost = (value: string) => {
+  if (isIP(value) !== 4) return false;
   if (value === "127.0.0.1") return true;
-  const octets = value.split(".");
-  if (octets.length !== 4 || octets.some((part) => !/^\d{1,3}$/.test(part))) return false;
-  const numbers = octets.map(Number);
-  if (numbers.some((part) => part < 0 || part > 255)) return false;
+  const numbers = value.split(".").map(Number);
   return numbers[0] === 100 && numbers[1]! >= 64 && numbers[1]! <= 127;
 };
 const requiredNumber = z.preprocess(
