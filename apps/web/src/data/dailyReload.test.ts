@@ -44,4 +44,39 @@ describe("scheduleDailyReload", () => {
 
     expect(setTimer.mock.calls[0]![1]).toBeGreaterThan(23 * 60 * 60 * 1000);
   });
+
+  it("continues scheduling when the reload marker cannot be read", () => {
+    const storage = {
+      getItem: vi.fn(() => { throw new DOMException("blocked", "SecurityError"); }),
+      setItem: vi.fn(),
+    };
+    const setTimer = vi.fn((_callback: () => void, _timeout: number) => 1 as unknown as ReturnType<typeof setTimeout>);
+
+    expect(() => scheduleDailyReload({
+      now: () => new Date("2026-08-27T01:00:00Z"),
+      reload: vi.fn(),
+      storage,
+      setTimer,
+      clearTimer: vi.fn(),
+    })).not.toThrow();
+    expect(setTimer).toHaveBeenCalledOnce();
+  });
+
+  it("still reloads when the reload marker cannot be written", () => {
+    const storage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(() => { throw new DOMException("full", "QuotaExceededError"); }),
+    };
+    const reload = vi.fn();
+    const setTimer = vi.fn((callback: () => void) => { callback(); return 1 as unknown as ReturnType<typeof setTimeout>; });
+
+    expect(() => scheduleDailyReload({
+      now: () => new Date("2026-08-27T01:00:00Z"),
+      reload,
+      storage,
+      setTimer,
+      clearTimer: vi.fn(),
+    })).not.toThrow();
+    expect(reload).toHaveBeenCalledOnce();
+  });
 });

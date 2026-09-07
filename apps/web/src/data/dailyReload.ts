@@ -50,14 +50,19 @@ function delayUntilReload(now: Date, lastReloadDate: string | null) {
 export function scheduleDailyReload(options: SchedulerOptions = {}) {
   const now = options.now ?? (() => new Date());
   const reload = options.reload ?? (() => window.location.reload());
-  const storage = options.storage ?? localStorage;
+  let storage = options.storage;
+  if (!storage) {
+    try { storage = window.localStorage; } catch { /* daily recovery must not depend on persistence */ }
+  }
   const setTimer = options.setTimer ?? ((handler, timeout) => setTimeout(handler, timeout));
   const clearTimer = options.clearTimer ?? ((timer) => clearTimeout(timer));
   const startedAt = now();
-  const delay = delayUntilReload(startedAt, storage.getItem(RELOAD_KEY));
+  let lastReloadDate: string | null = null;
+  try { lastReloadDate = storage?.getItem(RELOAD_KEY) ?? null; } catch { /* treat an unreadable marker as absent */ }
+  const delay = delayUntilReload(startedAt, lastReloadDate);
 
   const timer = setTimer(() => {
-    storage.setItem(RELOAD_KEY, localParts(new Date(startedAt.getTime() + delay)).date);
+    try { storage?.setItem(RELOAD_KEY, localParts(new Date(startedAt.getTime() + delay)).date); } catch { /* persistence is best effort */ }
     reload();
   }, delay);
 
