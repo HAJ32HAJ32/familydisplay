@@ -11,7 +11,7 @@ A read-only household kiosk showing yesterday, today, and the next six days from
 
 ## Configure
 
-Copy `.env.example` to a server-only environment file and replace every placeholder. Do not commit it.
+Copy `.env.example` to a server-only environment file and replace every placeholder. Do not commit it. `HOST` defaults to loopback and may only be set to `127.0.0.1` or a Tailscale IPv4 address in `100.64.0.0/10`; wildcard, LAN, hostname, and public binds fail startup.
 
 The five `GOOGLE_CALENDAR_*` values map calendar IDs to the fixed household display groups. `APP_TIMEZONE` must remain `Europe/London`. Latitude, longitude, OAuth material, calendar IDs, and `EVENT_ID_SALT` stay on the server and are never returned to the browser.
 
@@ -41,13 +41,13 @@ Export the configured environment values, then start the built API:
 npm run start -w @family-display/api
 ```
 
-By default the service listens on port `3000` and serves:
+By default the service listens on `127.0.0.1:3000` and serves:
 
 - `/` — the kiosk display
 - `/api/today` — the validated display payload
 - `/healthz` — shallow process health (`{"status":"ok"}`)
 
-Point Chromium kiosk mode at the private service URL. The application is intentionally non-interactive: no calendar editing, forms, account UI, or navigation.
+Point Chromium kiosk mode at the private service URL. The application is intentionally non-interactive: no calendar editing, forms, account UI, or navigation. See [`docs/deployment.md`](docs/deployment.md) for the private-bind and service checklist.
 
 ## Development
 

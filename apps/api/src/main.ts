@@ -17,6 +17,6 @@ async function main() {
   const app = await buildServer({ service, webRoot });
   const shutdown = async () => { await app.close(); process.exit(0); };
   process.once("SIGINT", shutdown); process.once("SIGTERM", shutdown);
-  await app.listen({ host: "0.0.0.0", port: config.port });
+  await app.listen({ host: config.host, port: config.port });
 }
 main().catch(() => { process.stderr.write("Family Display failed to start: invalid configuration or server error\n"); process.exit(1); });

@@ -2,12 +2,21 @@ import { z } from "zod";
 import type { Group } from "@family-display/contract";
 
 const requiredText = z.string().refine((value) => value.trim().length > 0);
+const isPrivateBindHost = (value: string) => {
+  if (value === "127.0.0.1") return true;
+  const octets = value.split(".");
+  if (octets.length !== 4 || octets.some((part) => !/^\d{1,3}$/.test(part))) return false;
+  const numbers = octets.map(Number);
+  if (numbers.some((part) => part < 0 || part > 255)) return false;
+  return numbers[0] === 100 && numbers[1]! >= 64 && numbers[1]! <= 127;
+};
 const requiredNumber = z.preprocess(
   (value) => typeof value === "string" && value.trim() === "" ? undefined : value,
   z.coerce.number()
 );
 
 const schema = z.object({
+  HOST: z.string().default("127.0.0.1").refine(isPrivateBindHost),
   PORT: z.coerce.number().int().min(1).max(65535).default(3000),
   APP_TIMEZONE: z.literal("Europe/London"),
   DISPLAY_LATITUDE: requiredNumber.pipe(z.number().min(-90).max(90)),
@@ -29,7 +38,7 @@ export function parseConfig(env: Record<string, string | undefined>) {
     { calendarId: data.GOOGLE_CALENDAR_RAFE, group: "rafe" }, { calendarId: data.GOOGLE_CALENDAR_H, group: "h" }, { calendarId: data.GOOGLE_CALENDAR_CHANTELE, group: "chantele" }
   ];
   if (new Set(calendars.map(({ calendarId }) => calendarId)).size !== calendars.length) throw new Error("Invalid server configuration");
-  return { port: data.PORT, timezone: data.APP_TIMEZONE, latitude: data.DISPLAY_LATITUDE, longitude: data.DISPLAY_LONGITUDE,
+  return { host: data.HOST, port: data.PORT, timezone: data.APP_TIMEZONE, latitude: data.DISPLAY_LATITUDE, longitude: data.DISPLAY_LONGITUDE,
     google: { clientId: data.GOOGLE_CLIENT_ID, clientSecret: data.GOOGLE_CLIENT_SECRET, refreshToken: data.GOOGLE_REFRESH_TOKEN }, calendars,
     eventIdSalt: data.EVENT_ID_SALT, calendarTtlMs: data.CALENDAR_CACHE_TTL_MS, weatherTtlMs: data.WEATHER_CACHE_TTL_MS };
 }

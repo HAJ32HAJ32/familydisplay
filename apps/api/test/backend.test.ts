@@ -35,7 +35,17 @@ describe("date window", () => {
 });
 
 describe("configuration", () => {
-  it("creates five mappings", () => expect(parseConfig(validEnv).calendars).toHaveLength(5));
+  it("creates five mappings and defaults to loopback", () => {
+    const config = parseConfig(validEnv);
+    expect(config.calendars).toHaveLength(5);
+    expect(config.host).toBe("127.0.0.1");
+  });
+  it.each(["100.64.0.1", "100.127.255.254"])("accepts a Tailscale IPv4 bind address", (host) => {
+    expect(parseConfig({ ...validEnv, HOST: host }).host).toBe(host);
+  });
+  it.each(["0.0.0.0", "192.168.1.5", "8.8.8.8", "localhost", "100.63.255.255", "100.128.0.0"])("rejects unsafe bind host %s", (host) => {
+    expect(() => parseConfig({ ...validEnv, HOST: host })).toThrow("Invalid server configuration");
+  });
   it.each([
     { ...validEnv, GOOGLE_CLIENT_SECRET: "" },
     { ...validEnv, GOOGLE_CLIENT_SECRET: "   " },
