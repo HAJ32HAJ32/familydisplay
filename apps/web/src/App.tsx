@@ -58,8 +58,8 @@ function eventTime(event: EventOccurrence, timezone: string) {
 
 function Events({ events, timezone, compact = false }: { events: EventOccurrence[]; timezone: string; compact?: boolean }) {
   if (events.length === 0) return <p className="empty-day">Nothing planned</p>;
-  const capacity = compact ? 2 : 4;
-  const visibleCount = events.length > capacity ? capacity - 1 : events.length;
+  const visibleLimit = compact ? 1 : 3;
+  const visibleCount = Math.min(events.length, visibleLimit);
   const visibleEvents = events.slice(0, visibleCount);
   const hiddenCount = events.length - visibleCount;
   return (
@@ -69,7 +69,9 @@ function Events({ events, timezone, compact = false }: { events: EventOccurrence
         const accessibleLabel = `${groupLabels[event.group].accessible}: ${event.title}, ${displayedTime}${event.location ? `, at ${event.location}` : ""}`;
         return (
           <li className={`event event--${event.group}`} key={event.id} aria-label={accessibleLabel}>
-            <time className="event__time">{displayedTime}</time>
+            {event.allDay
+              ? <span className="event__time event__time--all-day" aria-hidden="true">—</span>
+              : <time className="event__time" dateTime={event.start}>{displayedTime}</time>}
             <span className="event__body">
               <strong className="event__title" title={event.title}>{event.title}</strong>
               {event.location && <span className="event__location" title={event.location}>{event.location}</span>}
@@ -111,8 +113,10 @@ function mealText(meal: Meal) {
 function MealSummary({ meal, today = false }: { meal: Meal | null; today?: boolean }) {
   if (!meal) return (
     <div className={`meal${today ? " meal--today" : ""} meal--empty`} aria-label={today ? "Tonight's meal not planned" : "Meal not planned"}>
-      <span className="eyebrow">{today ? "Tonight’s meal" : "Dinner"}</span>
-      <span>Dinner not set</span>
+      <div>
+        <span className="eyebrow">{today ? "Tonight’s meal" : "Dinner"}</span>
+        <span className="meal__value">Dinner not set</span>
+      </div>
     </div>
   );
   const text = mealText(meal);
@@ -182,27 +186,28 @@ function Freshness({ payload, stale }: { payload: DisplayPayload; stale: boolean
 }
 
 const colourGuide = [
-  { googleColour: "Grape", group: "H + Chantele", className: "grape" },
-  { googleColour: "Blueberry", group: "All", className: "blueberry" },
-  { googleColour: "Basil", group: "Rafe", className: "basil" },
-  { googleColour: "Graphite", group: "H", className: "graphite" },
-  { googleColour: "Banana", group: "Chantele", className: "banana" },
-  { googleColour: "Tangerine", group: "Household", className: "tangerine" },
+  { googleColour: "Grape", group: "H + Chantele", label: "H + C", className: "grape" },
+  { googleColour: "Blueberry", group: "All", label: "All", className: "blueberry" },
+  { googleColour: "Basil", group: "Rafe", label: "Rafe", className: "basil" },
+  { googleColour: "Graphite", group: "H", label: "H", className: "graphite" },
+  { googleColour: "Banana", group: "Chantele", label: "Chantele", className: "banana" },
+  { googleColour: "Tangerine", group: "Household", label: "Household", className: "tangerine" },
 ] as const;
 
 function ColourGuide({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
   return (
-    <footer className="colour-guide" aria-label="Google Calendar colour guide">
+    <aside className="colour-guide" aria-label="Google Calendar colour guide">
+      <p className="eyebrow colour-guide__title">Calendar key</p>
       <div className="colour-guide__items">
         {colourGuide.map((item) => (
-          <span className="colour-guide__item" key={item.googleColour}>
+          <span className="colour-guide__item" key={item.googleColour} aria-label={`${item.googleColour}: ${item.group}`}>
             <span className={`colour-guide__swatch colour-guide__swatch--${item.className}`} aria-hidden="true" />
-            <span>{item.googleColour} <strong>{item.group}</strong></span>
+            <strong>{item.label}</strong>
           </span>
         ))}
       </div>
       <Freshness payload={payload} stale={stale} />
-    </footer>
+    </aside>
   );
 }
 
@@ -221,12 +226,14 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
     <main className="display-board">
       <div className="top-row">
         <TodayCard day={payload.days[0]!} timezone={payload.timezone} morningQuote={payload.morningQuote} />
-        <YesterdayPanel payload={payload} />
+        <div className="top-row__rail">
+          <ColourGuide payload={payload} stale={stale} />
+          <YesterdayPanel payload={payload} />
+        </div>
       </div>
       <div className="future-grid">
         {payload.days.slice(1).map((day) => <FutureDay day={day} timezone={payload.timezone} key={day.date} />)}
       </div>
-      <ColourGuide payload={payload} stale={stale} />
     </main>
   );
 }

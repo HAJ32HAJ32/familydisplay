@@ -6,13 +6,14 @@ import { describe, expect, it } from "vitest";
 const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 const responsiveStyles = styles.slice(styles.indexOf("@media (max-width: 900px)"));
 
-describe("responsive colour guide", () => {
-  it("pins the guide to the viewport bottom outside the desktop grid", () => {
-    expect(responsiveStyles).toMatch(/\.colour-guide\s*\{[^}]*position:\s*fixed;[^}]*bottom:\s*0;/s);
+describe("top-right colour guide", () => {
+  it("stacks the guide above yesterday in a dedicated rail", () => {
+    expect(styles).toMatch(/\.top-row__rail\s*\{[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\);/s);
+    expect(styles).toMatch(/\.colour-guide\s*\{[^}]*flex-direction:\s*column;/s);
   });
 
-  it("allows all guide items to wrap instead of overflowing narrow screens", () => {
-    expect(responsiveStyles).toMatch(/\.colour-guide__items\s*\{[^}]*flex-wrap:\s*wrap;/s);
+  it("keeps the guide in document flow rather than pinning it to the bottom on narrow screens", () => {
+    expect(responsiveStyles).not.toMatch(/\.colour-guide\s*\{[^}]*position:\s*fixed;/s);
   });
 });
 
@@ -30,17 +31,21 @@ function contrast(foreground: string, background: string) {
 }
 
 describe("visual system", () => {
-  it("raises the complete TV type scale by roughly twelve percent", () => {
-    expect(styles).toContain("--text-label: clamp(0.76rem, 0.81vw, 0.92rem)");
-    expect(styles).toContain("--text-small: clamp(0.85rem, 0.92vw, 1.05rem)");
-    expect(styles).toContain("--text-body: clamp(0.99rem, 1.12vw, 1.25rem)");
-    expect(styles).toContain("--text-title: clamp(1.23rem, 1.57vw, 1.79rem)");
-    expect(styles).toContain("--text-display: clamp(3.64rem, 6.05vw, 6.72rem)");
+  it("raises the complete TV type scale by roughly fifty percent on a clean modular scale", () => {
+    expect(styles).toContain("--text-label: clamp(1.125rem, 1.2vw, 1.375rem)");
+    expect(styles).toContain("--text-small: clamp(1.25rem, 1.375vw, 1.5625rem)");
+    expect(styles).toContain("--text-body: clamp(1.5rem, 1.675vw, 1.875rem)");
+    expect(styles).toContain("--text-title: clamp(1.875rem, 2.35vw, 2.6875rem)");
+    expect(styles).toContain("--text-display: clamp(5.5rem, 9vw, 10rem)");
   });
 
-  it("raises standalone weather and narrow-screen labels with the shared stack", () => {
-    expect(styles).toContain("font-size: clamp(1.4rem, 2.02vw, 2.24rem)");
-    expect(styles).not.toContain("font-size: 0.64rem");
+  it("raises standalone weather text and all local icons with the same visual scale", () => {
+    expect(styles).toContain("font-size: clamp(2.125rem, 3vw, 3.375rem)");
+    expect(styles).toContain("--icon-sm: 1.75rem");
+    expect(styles).toContain("--icon-md: 2.625rem");
+    expect(styles).toContain("--icon-lg: 3.5rem");
+    expect(styles).toMatch(/\.icon\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
+    expect(styles).toMatch(/\.icon--weather\s*\{[^}]*width:\s*var\(--icon-lg\);[^}]*height:\s*var\(--icon-lg\);/s);
   });
 
   it.each([

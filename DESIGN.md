@@ -18,23 +18,23 @@ colors:
 typography:
   display:
     fontFamily: Inter
-    fontSize: 6.05vw
+    fontSize: 9vw
     fontWeight: 300
     lineHeight: 0.9
     letterSpacing: "-0.05em"
   title:
     fontFamily: Inter
-    fontSize: 1.57vw
+    fontSize: 2.35vw
     fontWeight: 650
     lineHeight: 1.15
   body:
     fontFamily: Inter
-    fontSize: 1.12vw
+    fontSize: 1.675vw
     fontWeight: 400
     lineHeight: 1.3
   label:
     fontFamily: Inter
-    fontSize: 0.81vw
+    fontSize: 1.2vw
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "0.06em"
@@ -101,19 +101,19 @@ The six event colours preserve the established Google Calendar mapping while usi
 
 ## Typography
 
-Use weight, size and restrained uppercase labels to establish hierarchy. The shared label, small, body, title and display steps are approximately 12% larger than the first deployed integrated-card release. Never reduce primary TV text merely to fit more content; truncate exceptional content predictably instead.
+Use weight, size and restrained uppercase labels to establish hierarchy. The shared label, small, body, title and display steps are approximately 50% larger than the previous television release and aligned to a clean modular scale. Never reduce primary TV text merely to fit more content; truncate exceptional content predictably instead.
 
 ## Layout
 
-All spacing is drawn from a four-point scale. The 1366×768 and television layouts must fit without scrolling. Narrow development views may stack and scroll normally.
+All spacing is drawn from a four-point scale. The 1366×768 and television layouts must fit without scrolling. The permanent calendar key lives in the top-right rail above the previous-day panel; narrow development views keep it in normal document flow and may stack and scroll normally.
 
 ## Shapes
 
-Panels use 20px radii, event pills use 12px radii, and compact controls or badges use 8px radii. Icons use consistent 16px, 24px or 32px boxes.
+Panels use 20px radii, event pills use 12px radii, and compact controls or badges use 8px radii. Local icons use a 28px, 42px and 56px scale, 75% larger than the first television release.
 
 ## Components
 
-The today panel combines date, forecast, outfit, schedule, dinner and the optional morning quote. The quote uses a restrained inset treatment beside dinner and remains absent when its private provider is not configured or unavailable. Every future-day column contains the same date-specific data categories in compressed form. Event pills are filled with their household-group colour, retain a visible group badge plus an accessible label that includes the displayed time, and replace overflow with a deterministic `+N more` summary rather than clipping events silently.
+The today panel combines date, forecast, outfit, schedule, dinner and the optional morning quote. The quote uses a restrained inset treatment beside dinner and remains absent when its private provider is not configured or unavailable. Every future-day column contains the same date-specific data categories in compressed form. Event pills are filled with their household-group colour, retain a visible group badge plus an accessible label that includes the displayed time, and replace overflow with a deterministic `+N more` summary rather than clipping events silently. All-day events show a visually separate em dash while their accessible event label continues to say “All day”.
 
 ## Do's and Don'ts
 
