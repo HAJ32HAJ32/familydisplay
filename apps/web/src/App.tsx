@@ -70,6 +70,31 @@ function Freshness({ payload, stale }: { payload: DisplayPayload; stale: boolean
   return <p className={`freshness${stale ? " freshness--stale" : ""}`}>{stale ? `Last updated ${time} · offline` : `Updated ${time}`}</p>;
 }
 
+const colourGuide = [
+  { googleColour: "Grape", group: "H + Chantele", className: "grape" },
+  { googleColour: "Blueberry", group: "All", className: "blueberry" },
+  { googleColour: "Basil", group: "Rafe", className: "basil" },
+  { googleColour: "Graphite", group: "H", className: "graphite" },
+  { googleColour: "Banana", group: "Chantele", className: "banana" },
+  { googleColour: "Tangerine", group: "Household", className: "tangerine" },
+] as const;
+
+function ColourGuide({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
+  return (
+    <footer className="colour-guide" aria-label="Google Calendar colour guide">
+      <div className="colour-guide__items">
+        {colourGuide.map((item) => (
+          <span className="colour-guide__item" key={item.googleColour}>
+            <span className={`colour-guide__swatch colour-guide__swatch--${item.className}`} aria-hidden="true" />
+            <span>{item.googleColour} <strong>{item.group}</strong></span>
+          </span>
+        ))}
+      </div>
+      <Freshness payload={payload} stale={stale} />
+    </footer>
+  );
+}
+
 function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
   return (
     <main className="display-board">
@@ -81,7 +106,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
       <div className="future-grid">
         {payload.days.slice(1).map((day) => <Day day={day} timezone={payload.timezone} variant="future" testId="future-day" key={day.date} />)}
       </div>
-      <Freshness payload={payload} stale={stale} />
+      <ColourGuide payload={payload} stale={stale} />
     </main>
   );
 }

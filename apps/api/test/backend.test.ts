@@ -64,24 +64,23 @@ describe("event processing", () => {
   const timedRawEvent = { id: "provider-id", summary: "Event", start: { dateTime: "2026-08-27T08:30:00+01:00" }, end: { dateTime: "2026-08-27T09:00:00+01:00" } };
 
   it.each([
-    ["Family", "1", "h-and-chantele", { calendarId: "family-calendar", defaultGroup: "all" as const }],
-    ["BAES", "2", "all", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
-    ["Family", "3", "rafe", { calendarId: "family-calendar", defaultGroup: "all" as const }],
-    ["BAES", "8", "h", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
-    ["Family", "11", "chantele", { calendarId: "family-calendar", defaultGroup: "all" as const }],
-    ["BAES", "5", "household", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }],
-    ["Family", "6", "household", { calendarId: "family-calendar", defaultGroup: "all" as const }]
-  ] as const)("maps %s Google event colour %s to %s", (_sourceName, colorId, expected, source) => {
-    expect(normalizeGoogleEvent(source, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
+    ["Grape", "3", "h-and-chantele"],
+    ["Blueberry", "9", "all"],
+    ["Basil", "10", "rafe"],
+    ["Graphite", "8", "h"],
+    ["Banana", "5", "chantele"],
+    ["Tangerine", "6", "household"]
+  ] as const)("maps Google %s colour %s to %s", (_colorName, colorId, expected) => {
+    expect(normalizeGoogleEvent(mapping, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
   });
 
   it.each([
-    ["Family missing colour", { calendarId: "family-calendar", defaultGroup: "all" as const }, undefined, "all"],
-    ["Family unsupported colour", { calendarId: "family-calendar", defaultGroup: "all" as const }, "9", "all"],
-    ["BAES missing colour", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }, undefined, "h-and-chantele"],
-    ["BAES unsupported colour", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }, "10", "h-and-chantele"]
-  ])("uses the source default for %s", (_name, source, colorId, expected) => {
-    expect(normalizeGoogleEvent(source, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
+    ["Family", { calendarId: "family-calendar", defaultGroup: "all" as const }, "all"],
+    ["BAES", { calendarId: "baes-calendar", defaultGroup: "h-and-chantele" as const }, "h-and-chantele"]
+  ] as const)("uses the %s source default for every other or missing colour", (_sourceName, source, expected) => {
+    for (const colorId of [undefined, null, "1", "2", "4", "7", "11", "999"] as const) {
+      expect(normalizeGoogleEvent(source, { ...timedRawEvent, colorId }, "salt")?.group).toBe(expected);
+    }
   });
 
   it("normalizes safely and creates an opaque ID", () => {

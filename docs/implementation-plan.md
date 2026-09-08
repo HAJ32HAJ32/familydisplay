@@ -241,7 +241,7 @@ The only accepted group values and their presentation tokens are:
 - `chantele`: pink/red; Chantele.
 - `household`: tangerine; household events such as the cleaner.
 
-Configure exactly two source calendars. `GOOGLE_CALENDAR_FAMILY` defaults events to `all`; `GOOGLE_CALENDAR_BAES` defaults events to `h-and-chantele`. For either source, recognised Google event `colorId` values override that default: lavender (`1`) → `h-and-chantele`, sage (`2`) → `all`, grape (`3`) → `rafe`, graphite (`8`) → `h`, tomato (`11`) → `chantele`, and banana/tangerine (`5`/`6`) → `household`. Missing or unsupported colour IDs retain the source default. Duplicate or missing source calendar IDs fail configuration/startup. The response never exposes colour IDs, human-readable member descriptions, email addresses, or calendar IDs.
+Configure exactly two source calendars. `GOOGLE_CALENDAR_FAMILY` defaults events to `all`; `GOOGLE_CALENDAR_BAES` defaults events to `h-and-chantele`. For either source, recognised Google event `colorId` values override that default: grape (`3`) → `h-and-chantele`, blueberry (`9`) → `all`, basil (`10`) → `rafe`, graphite (`8`) → `h`, banana (`5`) → `chantele`, and tangerine (`6`) → `household`. Missing or unsupported colour IDs retain the source default. The display includes a slim permanent legend along its bottom edge using the Google colour names and resulting display groups. Duplicate or missing source calendar IDs fail configuration/startup. The response never exposes colour IDs, human-readable member descriptions, email addresses, or calendar IDs.
 
 Colour cannot be the only group cue. Each event row must also expose a short visible label or shape marker, and an accessible label containing the group name.
 
