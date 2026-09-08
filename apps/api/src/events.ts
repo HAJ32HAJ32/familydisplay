@@ -6,13 +6,12 @@ import { TIMEZONE } from "./date-window.js";
 
 export type RawGoogleEvent = { id?: string | null; recurringEventId?: string | null; originalStartTime?: { date?: string | null; dateTime?: string | null }; colorId?: string | null; summary?: string | null; location?: string | null; status?: string | null; start?: { date?: string | null; dateTime?: string | null }; end?: { date?: string | null; dateTime?: string | null }; attendees?: Array<{ self?: boolean | null; responseStatus?: string | null; email?: string | null }> | null; description?: string | null };
 const groupByGoogleColorId = {
-  "1": "h-and-chantele",
-  "2": "all",
-  "3": "rafe",
-  "5": "household",
+  "3": "h-and-chantele",
+  "5": "chantele",
   "6": "household",
   "8": "h",
-  "11": "chantele"
+  "9": "all",
+  "10": "rafe"
 } as const satisfies Record<string, EventOccurrence["group"]>;
 const localMidnight = (date: string) => DateTime.fromISO(date, { zone: TIMEZONE }).startOf("day").toISO({ suppressMilliseconds: true })!;
 export function normalizeGoogleEvent(mapping: CalendarMapping, raw: RawGoogleEvent, salt: string): EventOccurrence | null {

@@ -139,6 +139,19 @@ describe("Family Display", () => {
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
+  it("shows the permanent Google colour legend along the bottom edge", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    const legend = await screen.findByLabelText("Google Calendar colour guide");
+    expect(legend).toHaveTextContent("Grape H + Chantele");
+    expect(legend).toHaveTextContent("Blueberry All");
+    expect(legend).toHaveTextContent("Basil Rafe");
+    expect(legend).toHaveTextContent("Graphite H");
+    expect(legend).toHaveTextContent("Banana Chantele");
+    expect(legend).toHaveTextContent("Tangerine Household");
+  });
+
   it("marks a successful server-declared stale response without hiding the board", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload, true));
 
