@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { scheduleDailyReload } from "./data/dailyReload";
@@ -202,7 +202,10 @@ describe("Family Display", () => {
     render(<App />);
 
     expect(await screen.findByLabelText("H and Chantele: Date night, 19:00")).toBeVisible();
-    expect(screen.getByLabelText("Everyone: Family day, All day, at Home")).toHaveTextContent("All day");
+    const allDay = screen.getByLabelText("Everyone: Family day, All day, at Home");
+    expect(allDay).toHaveTextContent("—");
+    expect(allDay).not.toHaveTextContent("All day");
+    expect(allDay.querySelector(".event__time--all-day")).toHaveAttribute("aria-hidden", "true");
     expect(screen.getByLabelText("Rafe: Nursery drop-off, 08:30, at Nursery")).toHaveTextContent("08:30");
     expect(screen.getByLabelText("H: Bins out, 07:00")).toBeVisible();
     expect(screen.getByLabelText("Chantele: Appointment, 11:00, at Clinic")).toBeVisible();
@@ -219,6 +222,21 @@ describe("Family Display", () => {
     expect(screen.getByLabelText("Meal: Sunday roast")).toBeVisible();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("groups an empty meal label and value vertically so the larger text can use the full card width", async () => {
+    const withoutMeals = {
+      ...payload,
+      days: payload.days.map((day, index) => index === 0 ? { ...day, meal: null } : day),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(withoutMeals));
+
+    render(<App />);
+
+    const emptyMeal = await screen.findByLabelText("Tonight's meal not planned");
+    const textGroup = emptyMeal.querySelector(":scope > div");
+    expect(textGroup).not.toBeNull();
+    expect(textGroup).toHaveTextContent("Tonight’s mealDinner not set");
   });
 
   it("renders a deterministic overflow summary instead of silently clipping valid events", async () => {
@@ -252,6 +270,28 @@ describe("Family Display", () => {
     expect(screen.getAllByText("+3 more")).toHaveLength(2);
   });
 
+  it("uses one compact event plus an overflow summary when a future day has exactly two events", async () => {
+    const twoEvents = {
+      ...payload,
+      days: payload.days.map((day, dayIndex) => dayIndex === 2
+        ? {
+            ...day,
+            events: [
+              { ...payload.days[0]!.events[1]!, id: "evt_compact_one", title: "First compact event" },
+              { ...payload.days[0]!.events[1]!, id: "evt_compact_two", title: "Second compact event" },
+            ],
+          }
+        : day),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(twoEvents));
+
+    render(<App />);
+
+    expect(await screen.findByText("First compact event")).toBeVisible();
+    expect(screen.queryByText("Second compact event")).not.toBeInTheDocument();
+    expect(screen.getByText("+1 more")).toBeVisible();
+  });
+
   it("renders the morning quote inside today's primary panel", async () => {
     const withQuote = { ...payload, morningQuote: { text: "Do the work in front of you.", attribution: "Marcus Aurelius" } };
     vi.mocked(fetch).mockResolvedValueOnce(response(withQuote));
@@ -275,17 +315,22 @@ describe("Family Display", () => {
     expect(screen.getByTestId("meal-icon-out")).toBeVisible();
   });
 
-  it("shows the permanent Google colour legend along the bottom edge", async () => {
+  it("places the permanent Google colour key in the top-right rail", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
 
     const legend = await screen.findByLabelText("Google Calendar colour guide");
-    expect(legend).toHaveTextContent("Grape H + Chantele");
-    expect(legend).toHaveTextContent("Blueberry All");
-    expect(legend).toHaveTextContent("Basil Rafe");
-    expect(legend).toHaveTextContent("Graphite H");
-    expect(legend).toHaveTextContent("Banana Chantele");
-    expect(legend).toHaveTextContent("Tangerine Household");
+    expect(legend.closest(".top-row__rail")).not.toBeNull();
+    expect(legend).toHaveTextContent("Calendar key");
+    expect(screen.getByLabelText("Grape: H + Chantele")).toBeVisible();
+    expect(screen.getByLabelText("Blueberry: All")).toBeVisible();
+    expect(screen.getByLabelText("Basil: Rafe")).toBeVisible();
+    expect(screen.getByLabelText("Graphite: H")).toBeVisible();
+    expect(screen.getByLabelText("Banana: Chantele")).toBeVisible();
+    expect(screen.getByLabelText("Tangerine: Household")).toBeVisible();
+    expect(within(legend).getByText("H + C", { exact: true })).toBeVisible();
+    expect(legend).not.toHaveTextContent("Grape");
+    expect(legend).not.toHaveTextContent("Blueberry");
   });
 
   it("marks a successful server-declared stale response without hiding the board", async () => {
