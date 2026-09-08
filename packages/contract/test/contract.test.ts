@@ -7,7 +7,7 @@ const fixture = JSON.parse(readFileSync(new URL("../fixtures/today.json", import
 const event = { id: "evt_123", title: "Breakfast", start: "2026-08-27T08:00:00+01:00", end: "2026-08-27T08:30:00+01:00", allDay: false, group: "all", location: "" };
 const day = (date: string, weekday: string, isToday = false) => ({ date, weekday, isToday, weather: null, events: [], meal: null });
 const valid = {
-  generatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London",
+  generatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London", morningQuote: null,
   yesterday: { date: "2026-08-26", weekday: "Wed", events: [event] },
   days: [day("2026-08-27", "Thu", true), day("2026-08-28", "Fri"), day("2026-08-29", "Sat"), day("2026-08-30", "Sun"), day("2026-08-31", "Mon"), day("2026-09-01", "Tue"), day("2026-09-02", "Wed")]
 };
@@ -15,9 +15,17 @@ const valid = {
 describe("displayPayloadSchema", () => {
   it("accepts the checked-in canonical fixture", () => expect(displayPayloadSchema.parse(fixture)).toEqual(fixture));
   it("accepts the canonical shape", () => expect(displayPayloadSchema.parse(valid)).toEqual(valid));
+  it("accepts a normalised weather condition", () => {
+    const withWeather = { ...valid, days: valid.days.map((value, index) => index === 0 ? { ...value, weather: { tempMaxC: 16, precipitationChance: 70, condition: "rain", outfit: "raincoat" } } : value) };
+    expect(displayPayloadSchema.parse(withWeather).days[0]?.weather).toMatchObject({ condition: "rain" });
+  });
   it("accepts the household group", () => {
     const withHousehold = { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "household" }] } };
     expect(displayPayloadSchema.parse(withHousehold)).toEqual(withHousehold);
+  });
+  it("accepts a bounded morning quote for the today panel", () => {
+    const withQuote = { ...valid, morningQuote: { text: "Waste no more time arguing what a good person should be. Be one.", attribution: "Marcus Aurelius" } };
+    expect(displayPayloadSchema.parse(withQuote).morningQuote).toEqual(withQuote.morningQuote);
   });
   it.each([
     ["invalid group", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "family" }] } }],

@@ -7,10 +7,12 @@ import { createDateWindow } from "../src/date-window.js";
 import { parseConfig } from "../src/config.js";
 import { groupEventsByDate, normalizeGoogleEvent, sortEvents } from "../src/events.js";
 import { RefreshCache } from "../src/cache.js";
-import { DisplayDataUnavailableError, DisplayService } from "../src/display-service.js";
+import { DisplayDataUnavailableError, DisplayService, weatherCondition } from "../src/display-service.js";
 import { buildServer } from "../src/server.js";
 import { GoogleCalendarProvider } from "../src/google-calendar-provider.js";
 import { OpenMeteoProvider } from "../src/open-meteo-provider.js";
+import { SousMealProvider } from "../src/sous-meal-provider.js";
+import { MorningQuoteProvider } from "../src/morning-quote-provider.js";
 
 const validEnv = {
   APP_TIMEZONE: "Europe/London", DISPLAY_LATITUDE: "51", DISPLAY_LONGITUDE: "-0.1",
@@ -44,6 +46,15 @@ describe("configuration", () => {
   });
   it.each(["100.64.0.1", "100.127.255.254"])("accepts a Tailscale IPv4 bind address", (host) => {
     expect(parseConfig({ ...validEnv, HOST: host }).host).toBe(host);
+  });
+  it("enables Sous only when its URL and token are both configured", () => {
+    expect(parseConfig({ ...validEnv, SOUS_MEALS_URL: "https://example.test/display-meals", SOUS_MEALS_TOKEN: "feed-token" }).sous).toEqual({ url: "https://example.test/display-meals", token: "feed-token" });
+    expect(() => parseConfig({ ...validEnv, SOUS_MEALS_URL: "https://example.test/display-meals" })).toThrow("Invalid server configuration");
+  });
+  it("enables the morning quote only with a complete HTTPS endpoint configuration", () => {
+    expect(parseConfig({ ...validEnv, MORNING_QUOTE_URL: "https://example.test/morning-quote", MORNING_QUOTE_TOKEN: "quote-token" }).morningQuote).toEqual({ url: "https://example.test/morning-quote", token: "quote-token" });
+    expect(() => parseConfig({ ...validEnv, MORNING_QUOTE_URL: "https://example.test/morning-quote" })).toThrow("Invalid server configuration");
+    expect(() => parseConfig({ ...validEnv, MORNING_QUOTE_URL: "http://example.test/morning-quote", MORNING_QUOTE_TOKEN: "quote-token" })).toThrow("Invalid server configuration");
   });
   it.each(["0.0.0.0", "192.168.1.5", "8.8.8.8", "localhost", "100.63.255.255", "100.128.0.0", "100.064.0.1", "100.64.0.1:3000", "100.64.0.1.example"])("rejects unsafe bind host %s", (host) => {
     expect(() => parseConfig({ ...validEnv, HOST: host })).toThrow("Invalid server configuration");
@@ -119,16 +130,102 @@ describe("refresh cache", () => {
 });
 
 describe("display service", () => {
+  it.each([[85, "snow"], [86, "snow"]] as const)("normalizes WMO %s to %s", (code, expected) => {
+    expect(weatherCondition(code)).toBe(expected);
+  });
+
   it("assembles a valid payload with weather and meals reserved", async () => {
-    const service = new DisplayService({ load: async () => [occurrence] }, { load: async () => new Map([["2026-08-27", { tempMaxC: 20.04, precipitationChance: 51 }]]) }, { clock });
+    const service = new DisplayService({ load: async () => [occurrence] }, { load: async () => new Map([["2026-08-27", { tempMaxC: 20.04, precipitationChance: 51, weatherCode: 61 }]]) }, { clock });
     const result = await service.getToday();
     expect(result.stale).toBe(false); expect(result.payload.days).toHaveLength(7);
-    expect(result.payload.days[0]).toMatchObject({ isToday: true, weather: { tempMaxC: 20, precipitationChance: 51, outfit: "raincoat" } });
+    expect(result.payload.days[0]).toMatchObject({ isToday: true, weather: { tempMaxC: 20, precipitationChance: 51, condition: "rain", outfit: "raincoat" } });
     expect(result.payload.days.every((day) => day.meal === null)).toBe(true);
   });
   it("keeps calendars and marks stale when weather fails", async () => {
     const result = await new DisplayService({ load: async () => [occurrence] }, { load: async () => { throw new Error("weather"); } }, { clock }).getToday();
     expect(result.stale).toBe(true); expect(result.payload.days[0]?.events).toHaveLength(1); expect(result.payload.days[0]?.weather).toBeNull();
+  });
+  it("adds meals by explicit date without making them a calendar concern", async () => {
+    const meals = { load: async () => new Map([["2026-08-27", { type: "recipe" as const, title: "Stir fry" }], ["2026-08-28", { type: "takeaway" as const }]]) };
+    const result = await new DisplayService({ load: async () => [] }, { load: async () => new Map() }, { clock, meals }).getToday();
+    expect(result.payload.days[0]?.meal).toEqual({ type: "recipe", title: "Stir fry" });
+    expect(result.payload.days[1]?.meal).toEqual({ type: "takeaway" });
+  });
+  it("adds the optional morning quote for today's London date", async () => {
+    const quote = { load: vi.fn(async () => ({ text: "Do the work in front of you.", attribution: "Marcus Aurelius" })) };
+    const result = await new DisplayService({ load: async () => [] }, { load: async () => new Map() }, { clock, morningQuote: quote }).getToday();
+
+    expect(quote.load).toHaveBeenCalledWith("2026-08-27");
+    expect(result.payload.morningQuote).toEqual({ text: "Do the work in front of you.", attribution: "Marcus Aurelius" });
+  });
+  it("keeps calendar data visible when the optional quote endpoint is unavailable", async () => {
+    const morningQuote = { load: async (): Promise<never> => { throw new Error("private quote detail"); } };
+    const result = await new DisplayService({ load: async () => [occurrence] }, { load: async () => new Map() }, { clock, morningQuote }).getToday();
+
+    expect(result.payload.days[0]?.events).toHaveLength(1);
+    expect(result.payload.morningQuote).toBeNull();
+    expect(result.stale).toBe(true);
+  });
+  it("keeps the board usable and marks it stale when Sous is unavailable", async () => {
+    const meals = { load: async (): Promise<never> => { throw new Error("private Sous detail"); } };
+    const result = await new DisplayService({ load: async () => [occurrence] }, { load: async () => new Map() }, { clock, meals }).getToday();
+    expect(result.stale).toBe(true);
+    expect(result.payload.days[0]?.events).toHaveLength(1);
+    expect(result.payload.days.every((day) => day.meal === null)).toBe(true);
+  });
+  it("keeps cached meals visible and marks them stale when a refresh fails", async () => {
+    let mealCalls = 0;
+    const meals = { load: async () => {
+      mealCalls += 1;
+      if (mealCalls > 1) throw new Error("private Sous detail");
+      return new Map([["2026-08-27", { type: "recipe" as const, title: "Stir fry" }]]);
+    } };
+    const service = new DisplayService({ load: async () => [] }, { load: async () => new Map() }, { clock, meals, mealTtlMs: 0 });
+
+    await service.getToday();
+    const result = await service.getToday();
+
+    expect(mealCalls).toBe(2);
+    expect(result.payload.days[0]?.meal).toEqual({ type: "recipe", title: "Stir fry" });
+    expect(result.stale).toBe(true);
+  });
+  it("preserves overlapping cached meals when the date window rolls over and Sous fails", async () => {
+    let current = new Date("2026-08-27T22:59:00Z");
+    let mealCalls = 0;
+    const meals = { load: async () => {
+      mealCalls += 1;
+      if (mealCalls > 1) throw new Error("private Sous detail");
+      return new Map([
+        ["2026-08-27", { type: "recipe" as const, title: "Thursday meal" }],
+        ["2026-08-28", { type: "recipe" as const, title: "Friday meal" }],
+        ["2026-08-29", { type: "recipe" as const, title: "Saturday meal" }],
+        ["2026-08-30", { type: "recipe" as const, title: "Sunday meal" }],
+        ["2026-08-31", { type: "recipe" as const, title: "Monday meal" }],
+        ["2026-09-01", { type: "recipe" as const, title: "Tuesday meal" }],
+        ["2026-09-02", { type: "recipe" as const, title: "Wednesday meal" }],
+      ]);
+    } };
+    const service = new DisplayService(
+      { load: async () => [] },
+      { load: async () => new Map() },
+      { clock: () => current, meals, mealTtlMs: 300_000 }
+    );
+
+    await service.getToday();
+    current = new Date("2026-08-27T23:01:00Z");
+    const result = await service.getToday();
+
+    expect(mealCalls).toBe(2);
+    expect(result.payload.days.map((day) => [day.date, day.meal && "title" in day.meal ? day.meal.title : null])).toEqual([
+      ["2026-08-28", "Friday meal"],
+      ["2026-08-29", "Saturday meal"],
+      ["2026-08-30", "Sunday meal"],
+      ["2026-08-31", "Monday meal"],
+      ["2026-09-01", "Tuesday meal"],
+      ["2026-09-02", "Wednesday meal"],
+      ["2026-09-03", null],
+    ]);
+    expect(result.stale).toBe(true);
   });
   it("returns last complete payload when calendar refresh fails", async () => {
     let fail = false;
@@ -181,9 +278,10 @@ describe("provider adapters", () => {
     expect(signal?.aborted).toBe(true);
   });
   it("normalizes Open-Meteo daily arrays by date", async () => {
-    const fetcher = vi.fn(async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44] } }), { status: 200 }));
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44], weather_code: [2] } }), { status: 200 }));
     const weather = await new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02");
-    expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44 });
+    expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44, weatherCode: 2 });
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain("weather_code");
     expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("postcode");
   });
   it("accepts documented Open-Meteo response metadata", async () => {
@@ -196,19 +294,79 @@ describe("provider adapters", () => {
       timezone_abbreviation: "BST",
       elevation: 159,
       daily_units: { time: "iso8601", temperature_2m_max: "°C", precipitation_probability_max: "%" },
-      daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44] }
+      daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44], weather_code: [2] }
     }), { status: 200 }));
     const weather = await new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02");
-    expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44 });
+    expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44, weatherCode: 2 });
   });
   it("rejects malformed weather responses", async () => {
     const fetcher = async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [] } }), { status: 200 });
     await expect(new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Weather data unavailable");
   });
+  it("rejects an oversized Open-Meteo response before accepting its valid JSON", async () => {
+    const body = `${" ".repeat(65_536)}${JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [19], precipitation_probability_max: [44], weather_code: [2] } })}`;
+    const fetcher = async () => new Response(body, { status: 200 });
+
+    await expect(new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Weather data unavailable");
+  });
+  it("rejects an Open-Meteo response whose declared length exceeds the byte limit", async () => {
+    const fetcher = async () => new Response(JSON.stringify({ daily: { time: [], temperature_2m_max: [], precipitation_probability_max: [], weather_code: [] } }), {
+      status: 200,
+      headers: { "Content-Length": "65537" },
+    });
+
+    await expect(new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Weather data unavailable");
+  });
+  it.each([50, 97, 98])("rejects unsupported WMO code %s at the provider boundary", async (weatherCode) => {
+    const fetcher = async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [19], precipitation_probability_max: [44], weather_code: [weatherCode] } }), { status: 200 });
+
+    await expect(new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Weather data unavailable");
+  });
+  it("loads a redacted morning quote using only the requested date", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ text: "Do the work in front of you.", attribution: "Marcus Aurelius" }), { status: 200 }));
+    const quote = await new MorningQuoteProvider("https://example.test/morning-quote", "quote-token", fetcher).load("2026-08-27");
+
+    expect(quote).toEqual({ text: "Do the work in front of you.", attribution: "Marcus Aurelius" });
+    const [input, init] = fetcher.mock.calls[0]!;
+    expect(String(input)).toBe("https://example.test/morning-quote?date=2026-08-27");
+    expect(init?.headers).toEqual({ Accept: "application/json", Authorization: "Bearer quote-token" });
+    expect(init?.redirect).toBe("error");
+  });
+  it("rejects an oversized morning quote response before accepting its valid JSON", async () => {
+    const padded = `${" ".repeat(65_536)}{\"text\":\"Do the work.\",\"attribution\":\"Marcus Aurelius\"}`;
+    const fetcher = async () => new Response(padded, { status: 200 });
+
+    await expect(new MorningQuoteProvider("https://example.test/morning-quote", "quote-token", fetcher).load("2026-08-27")).rejects.toThrow("Morning quote unavailable");
+  });
+  it("loads a redacted Sous meal feed by explicit date range", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({ meals: [
+      { date: "2026-08-27", type: "recipe", title: "Stir fry" },
+      { date: "2026-08-28", type: "out" },
+      { date: "2026-08-29", type: "takeaway" }
+    ] }), { status: 200 }));
+    const meals = await new SousMealProvider("https://example.test/display-meals", "feed-token", fetcher).load("2026-08-27", "2026-09-02");
+    expect(meals.get("2026-08-27")).toEqual({ type: "recipe", title: "Stir fry" });
+    expect(meals.get("2026-08-28")).toEqual({ type: "out" });
+    const [input, init] = fetcher.mock.calls[0]!;
+    expect(String(input)).toBe("https://example.test/display-meals?start_date=2026-08-27&end_date=2026-09-02");
+    expect(init?.headers).toEqual({ Accept: "application/json", Authorization: "Bearer feed-token" });
+  });
+  it("rejects malformed, duplicate or oversized Sous meal feeds", async () => {
+    const duplicate = async () => new Response(JSON.stringify({ meals: [{ date: "2026-08-27", type: "out" }, { date: "2026-08-27", type: "takeaway" }] }), { status: 200 });
+    await expect(new SousMealProvider("https://example.test/display-meals", "token", duplicate).load("2026-08-27", "2026-09-02")).rejects.toThrow("Meal data unavailable");
+    const oversized = async () => new Response(JSON.stringify({ meals: Array.from({ length: 8 }, (_, index) => ({ date: `2026-08-${String(20 + index).padStart(2, "0")}`, type: "out" })) }), { status: 200 });
+    await expect(new SousMealProvider("https://example.test/display-meals", "token", oversized).load("2026-08-20", "2026-08-27")).rejects.toThrow("Meal data unavailable");
+  });
+  it("rejects a Sous response larger than the byte limit even when its JSON is valid", async () => {
+    const padded = `${" ".repeat(65_536)}{\"meals\":[]}`;
+    const fetcher = async () => new Response(padded, { status: 200 });
+
+    await expect(new SousMealProvider("https://example.test/display-meals", "token", fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Meal data unavailable");
+  });
 });
 
-describe("HTTP routes", () => {
-  const payload = { generatedAt: "2026-08-27T13:00:00+01:00", timezone: "Europe/London" as const, yesterday: { date: "2026-08-26", weekday: "Wed" as const, events: [] }, days: ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"].map((date, i) => ({ date, weekday: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][i]!, isToday: i === 0, weather: null, events: [], meal: null })) };
+ describe("HTTP routes", () => {
+  const payload = { generatedAt: "2026-08-27T13:00:00+01:00", timezone: "Europe/London" as const, morningQuote: null, yesterday: { date: "2026-08-26", weekday: "Wed" as const, events: [] }, days: ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"].map((date, i) => ({ date, weekday: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][i]!, isToday: i === 0, weather: null, events: [], meal: null })) };
   it("serves provider-independent health", async () => { const app = await buildServer({ service: { getToday: async () => { throw new Error("must not run"); } } }); const response = await app.inject({ method: "GET", url: "/healthz" }); expect(response.json()).toEqual({ status: "ok" }); await app.close(); });
   it("serves today with freshness and no-store headers", async () => { const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(200); expect(response.headers["x-data-stale"]).toBe("false"); expect(response.headers["cache-control"]).toBe("no-store"); await app.close(); });
   it("returns a redacted 503 for provider availability failures", async () => { const app = await buildServer({ service: { getToday: async () => { throw new DisplayDataUnavailableError(); } } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(503); expect(response.body).not.toContain("google"); expect(response.json()).toEqual({ error: { code: "DISPLAY_DATA_UNAVAILABLE", message: "Display data is temporarily unavailable" } }); await app.close(); });

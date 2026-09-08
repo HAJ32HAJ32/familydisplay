@@ -1,6 +1,10 @@
 {
   "generatedAt": "2026-08-27T18:42:00+01:00",
   "timezone": "Europe/London",
+  "morningQuote": {
+    "text": "Do the work in front of you.",
+    "attribution": "Marcus Aurelius"
+  },
   "yesterday": {
     "date": "2026-08-26",
     "weekday": "Wed",
@@ -24,6 +28,7 @@
       "weather": {
         "tempMaxC": 19.2,
         "precipitationChance": 65,
+        "condition": "rain",
         "outfit": "raincoat"
       },
       "events": [
@@ -55,6 +60,7 @@
       "weather": {
         "tempMaxC": 21,
         "precipitationChance": 20,
+        "condition": "clear",
         "outfit": "tshirt"
       },
       "events": [

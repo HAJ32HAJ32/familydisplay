@@ -38,13 +38,91 @@ describe("Family Display", () => {
   });
 
   it("renders a valid browser snapshot as stale on an offline cold start", async () => {
-    localStorage.setItem("family-display:last-good:v1", JSON.stringify({ payload, receivedAt: "2026-08-27T18:42:00+01:00" }));
+    localStorage.setItem("family-display:last-good:v2", JSON.stringify({ payload, receivedAt: "2026-08-27T18:42:00+01:00" }));
     vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
 
     render(<App />);
 
     expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
     expect(screen.getByText("Last updated 18:42 · offline")).toBeVisible();
+  });
+
+  it("ignores and removes a pre-change cache payload while current startup succeeds", async () => {
+    const legacyPayload: Record<string, unknown> = { ...payload };
+    delete legacyPayload.morningQuote;
+    localStorage.setItem("family-display:last-good:v1", JSON.stringify({ payload: legacyPayload, receivedAt: "2026-08-27T18:42:00+01:00" }));
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
+    expect(localStorage.getItem("family-display:last-good:v1")).toBeNull();
+    expect(localStorage.getItem("family-display:last-good:v2")).not.toBeNull();
+  });
+
+  it("migrates a pre-change cache payload before an offline cold start", async () => {
+    const legacyPayload: Record<string, unknown> = {
+      ...payload,
+      days: payload.days.map((day) => ({
+        ...day,
+        weather: day.weather
+          ? { tempMaxC: day.weather.tempMaxC, precipitationChance: day.weather.precipitationChance, outfit: day.weather.outfit }
+          : null,
+      })),
+    };
+    delete legacyPayload.morningQuote;
+    localStorage.setItem("family-display:last-good:v1", JSON.stringify({ payload: legacyPayload, receivedAt: "2026-08-27T18:42:00+01:00" }));
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
+    expect(screen.getByText("Last updated 18:42 · offline")).toBeVisible();
+    expect(screen.getByLabelText("Everyone: Family day, All day, at Home")).toBeVisible();
+    expect(screen.queryByLabelText(/Thursday weather:/)).not.toBeInTheDocument();
+    expect(localStorage.getItem("family-display:last-good:v1")).toBeNull();
+    const migrated = JSON.parse(localStorage.getItem("family-display:last-good:v2")!);
+    expect(migrated.payload.morningQuote).toBeNull();
+    expect(migrated.payload.days[0].events).toEqual(payload.days[0].events);
+    expect(migrated.payload.days.every((day: { weather: unknown }) => day.weather === null)).toBe(true);
+  });
+
+  it("recovers from a valid v1 snapshot when the v2 snapshot is corrupt", async () => {
+    const legacyPayload: Record<string, unknown> = {
+      ...payload,
+      days: payload.days.map((day) => ({
+        ...day,
+        weather: day.weather
+          ? { tempMaxC: day.weather.tempMaxC, precipitationChance: day.weather.precipitationChance, outfit: day.weather.outfit }
+          : null,
+      })),
+    };
+    delete legacyPayload.morningQuote;
+    localStorage.setItem("family-display:last-good:v2", "{\"payload\":\"invalid\"}");
+    localStorage.setItem("family-display:last-good:v1", JSON.stringify({ payload: legacyPayload, receivedAt: "2026-08-27T18:42:00+01:00" }));
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
+    expect(screen.getByText("Last updated 18:42 · offline")).toBeVisible();
+    const migrated = JSON.parse(localStorage.getItem("family-display:last-good:v2")!);
+    expect(migrated.payload.morningQuote).toBeNull();
+    expect(migrated.payload.days[0].events).toEqual(payload.days[0].events);
+    expect(migrated.payload.days.every((day: { weather: unknown }) => day.weather === null)).toBe(true);
+    expect(localStorage.getItem("family-display:last-good:v1")).toBeNull();
+  });
+
+  it("retains a malformed v1 snapshot when migration cannot validate it", async () => {
+    const malformed = JSON.stringify({ payload: { generatedAt: "not-a-date" }, receivedAt: "2026-08-27T18:42:00+01:00" });
+    localStorage.setItem("family-display:last-good:v1", malformed);
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Calendar temporarily unavailable" })).toBeVisible();
+    expect(localStorage.getItem("family-display:last-good:v1")).toBe(malformed);
+    expect(localStorage.getItem("family-display:last-good:v2")).toBeNull();
   });
 
   it("atomically replaces the board when a background poll succeeds", async () => {
@@ -62,13 +140,13 @@ describe("Family Display", () => {
 
     render(<App />);
     await act(async () => { await Promise.resolve(); });
-    expect(screen.getByLabelText("Everyone: Family day, at Home")).toBeVisible();
+    expect(screen.getByLabelText("Everyone: Family day, All day, at Home")).toBeVisible();
 
     await act(async () => { await vi.advanceTimersByTimeAsync(300_000); });
 
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(screen.queryByLabelText("Everyone: Family day, at Home")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Everyone: Calendar refreshed, at Home")).toBeVisible();
+    expect(screen.queryByLabelText("Everyone: Family day, All day, at Home")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Everyone: Calendar refreshed, All day, at Home")).toBeVisible();
     expect(screen.getByText("Updated 18:47")).toBeVisible();
   });
 
@@ -123,20 +201,78 @@ describe("Family Display", () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
 
-    expect(await screen.findByLabelText("H and Chantele: Date night")).toBeVisible();
-    expect(screen.getByLabelText("Everyone: Family day, at Home")).toHaveTextContent("All day");
-    expect(screen.getByLabelText("Rafe: Nursery drop-off, at Nursery")).toHaveTextContent("08:30");
-    expect(screen.getByLabelText("H: Bins out")).toBeVisible();
-    expect(screen.getByLabelText("Chantele: Appointment, at Clinic")).toBeVisible();
-    const household = screen.getByLabelText("Household: Cleaner");
+    expect(await screen.findByLabelText("H and Chantele: Date night, 19:00")).toBeVisible();
+    expect(screen.getByLabelText("Everyone: Family day, All day, at Home")).toHaveTextContent("All day");
+    expect(screen.getByLabelText("Rafe: Nursery drop-off, 08:30, at Nursery")).toHaveTextContent("08:30");
+    expect(screen.getByLabelText("H: Bins out, 07:00")).toBeVisible();
+    expect(screen.getByLabelText("Chantele: Appointment, 11:00, at Clinic")).toBeVisible();
+    const household = screen.getByLabelText("Household: Cleaner, 10:00");
     expect(household).toBeVisible();
     expect(household).toHaveTextContent("Household");
     expect(household).toHaveClass("event--household");
     expect(screen.getAllByText("Nothing planned")).toHaveLength(3);
-    expect(screen.getByLabelText(/Maximum 19 degrees Celsius/)).toBeVisible();
-    expect(screen.queryByLabelText(/Maximum 21 degrees Celsius/)).not.toBeInTheDocument();
+    expect(screen.getByLabelText(/Thursday weather: Rain, maximum 19 degrees Celsius/)).toBeVisible();
+    expect(screen.getByLabelText(/Friday weather: Clear, maximum 21 degrees Celsius/)).toBeVisible();
+    expect(screen.getByLabelText("Tonight's meal: Stir fry")).toBeVisible();
+    expect(screen.getByLabelText("Meal: Takeaway")).toBeVisible();
+    expect(screen.getByLabelText("Meal: Eating out")).toBeVisible();
+    expect(screen.getByLabelText("Meal: Sunday roast")).toBeVisible();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+
+  it("renders a deterministic overflow summary instead of silently clipping valid events", async () => {
+    const crowded = {
+      ...payload,
+      days: payload.days.map((day, dayIndex) => {
+        const count = dayIndex === 0 ? 6 : dayIndex === 1 ? 4 : 0;
+        if (count === 0) return day;
+        return {
+          ...day,
+          events: Array.from({ length: count }, (_, index) => ({
+            ...day.events[dayIndex === 0 ? 1 : 0]!,
+            id: `evt_crowded_${dayIndex}_${index}`,
+            title: `${dayIndex === 0 ? "Today" : "Future"} event ${index + 1}`,
+            start: `2026-08-${dayIndex === 0 ? "27" : "28"}T${String(8 + index).padStart(2, "0")}:00:00+01:00`,
+            end: `2026-08-${dayIndex === 0 ? "27" : "28"}T${String(9 + index).padStart(2, "0")}:00:00+01:00`,
+            allDay: false,
+          })),
+        };
+      }),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(crowded));
+
+    render(<App />);
+
+    expect(await screen.findByText("Today event 1")).toBeVisible();
+    expect(screen.getByText("Today event 3")).toBeVisible();
+    expect(screen.queryByText("Today event 4")).not.toBeInTheDocument();
+    expect(screen.getByText("Future event 1")).toBeVisible();
+    expect(screen.queryByText("Future event 2")).not.toBeInTheDocument();
+    expect(screen.getAllByText("+3 more")).toHaveLength(2);
+  });
+
+  it("renders the morning quote inside today's primary panel", async () => {
+    const withQuote = { ...payload, morningQuote: { text: "Do the work in front of you.", attribution: "Marcus Aurelius" } };
+    vi.mocked(fetch).mockResolvedValueOnce(response(withQuote));
+
+    render(<App />);
+
+    const quote = await screen.findByRole("blockquote", { name: "Morning quote" });
+    expect(quote).toHaveTextContent("Do the work in front of you.");
+    expect(quote).toHaveTextContent("Marcus Aurelius");
+  });
+
+  it("renders local weather, outfit and meal icons from the shared icon library", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    expect(await screen.findByTestId("weather-icon-rain")).toBeVisible();
+    expect(screen.getByTestId("weather-icon-clear")).toBeVisible();
+    expect(screen.getAllByTestId("outfit-icon-raincoat").length).toBeGreaterThan(0);
+    expect(screen.getAllByTestId("meal-icon-recipe").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("meal-icon-takeaway")).toBeVisible();
+    expect(screen.getByTestId("meal-icon-out")).toBeVisible();
   });
 
   it("shows the permanent Google colour legend along the bottom edge", async () => {
@@ -162,7 +298,7 @@ describe("Family Display", () => {
   });
 
   it("shows the safe retrying state when live and cached data are unusable", async () => {
-    localStorage.setItem("family-display:last-good:v1", "{\"payload\":\"invalid\"}");
+    localStorage.setItem("family-display:last-good:v2", "{\"payload\":\"invalid\"}");
     vi.mocked(fetch).mockResolvedValueOnce(new Response("service detail", { status: 503 }));
 
     render(<App />);
@@ -170,7 +306,7 @@ describe("Family Display", () => {
     expect(await screen.findByRole("heading", { name: "Calendar temporarily unavailable" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Trying again…");
     expect(screen.queryByText("service detail")).not.toBeInTheDocument();
-    expect(localStorage.getItem("family-display:last-good:v1")).toBeNull();
+    expect(localStorage.getItem("family-display:last-good:v2")).toBeNull();
   });
 
   it("keeps a valid live response visible when browser persistence is unavailable", async () => {

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const groups = ["h-and-chantele", "all", "rafe", "h", "chantele", "household"] as const;
 export const outfits = ["tshirt", "long-sleeve", "hoodie", "coat", "raincoat"] as const;
+export const weatherConditions = ["clear", "partly-cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "showers", "thunderstorm"] as const;
 export const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
@@ -17,6 +18,7 @@ const timestampSchema = z.string().regex(offsetTimestampPattern, "Timestamp requ
 
 export const groupSchema = z.enum(groups);
 export const outfitSchema = z.enum(outfits);
+export const weatherConditionSchema = z.enum(weatherConditions);
 export const weekdaySchema = z.enum(weekdays);
 export const eventOccurrenceSchema = z.strictObject({
   id: z.string().trim().min(1).max(200),
@@ -33,6 +35,7 @@ export const eventOccurrenceSchema = z.strictObject({
 export const weatherSummarySchema = z.strictObject({
   tempMaxC: z.number().finite().min(-50).max(60),
   precipitationChance: z.number().int().min(0).max(100),
+  condition: weatherConditionSchema,
   outfit: outfitSchema
 });
 export const mealSchema = z.discriminatedUnion("type", [
@@ -40,6 +43,10 @@ export const mealSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("out") }),
   z.strictObject({ type: z.literal("takeaway") })
 ]);
+export const morningQuoteSchema = z.strictObject({
+  text: z.string().trim().min(1).max(500),
+  attribution: z.string().trim().min(1).max(120)
+});
 export const displayDaySchema = z.strictObject({
   date: localDateSchema,
   weekday: weekdaySchema,
@@ -53,6 +60,7 @@ const sevenDaysSchema = z.tuple([displayDaySchema, displayDaySchema, displayDayS
 export const displayPayloadSchema = z.strictObject({
   generatedAt: timestampSchema,
   timezone: z.literal("Europe/London"),
+  morningQuote: morningQuoteSchema.nullable(),
   yesterday: z.strictObject({ date: localDateSchema, weekday: weekdaySchema, events: z.array(eventOccurrenceSchema) }),
   days: sevenDaysSchema
 }).superRefine((payload, context) => {
@@ -69,7 +77,10 @@ export const displayPayloadSchema = z.strictObject({
 
 export type Group = z.infer<typeof groupSchema>;
 export type Outfit = z.infer<typeof outfitSchema>;
+export type WeatherCondition = z.infer<typeof weatherConditionSchema>;
 export type EventOccurrence = z.infer<typeof eventOccurrenceSchema>;
 export type WeatherSummary = z.infer<typeof weatherSummarySchema>;
+export type Meal = z.infer<typeof mealSchema>;
+export type MorningQuote = z.infer<typeof morningQuoteSchema>;
 export type DisplayDay = z.infer<typeof displayDaySchema>;
 export type DisplayPayload = z.infer<typeof displayPayloadSchema>;
