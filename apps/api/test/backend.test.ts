@@ -186,6 +186,21 @@ describe("provider adapters", () => {
     expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44 });
     expect(String(fetcher.mock.calls[0]?.[0])).not.toContain("postcode");
   });
+  it("accepts documented Open-Meteo response metadata", async () => {
+    const fetcher = vi.fn(async () => new Response(JSON.stringify({
+      latitude: 51.3,
+      longitude: -0.1,
+      generationtime_ms: 0.04,
+      utc_offset_seconds: 3600,
+      timezone: "Europe/London",
+      timezone_abbreviation: "BST",
+      elevation: 159,
+      daily_units: { time: "iso8601", temperature_2m_max: "°C", precipitation_probability_max: "%" },
+      daily: { time: ["2026-08-27"], temperature_2m_max: [19.24], precipitation_probability_max: [44] }
+    }), { status: 200 }));
+    const weather = await new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02");
+    expect(weather.get("2026-08-27")).toEqual({ tempMaxC: 19.24, precipitationChance: 44 });
+  });
   it("rejects malformed weather responses", async () => {
     const fetcher = async () => new Response(JSON.stringify({ daily: { time: ["2026-08-27"], temperature_2m_max: [] } }), { status: 200 });
     await expect(new OpenMeteoProvider(51, -0.1, fetcher).load("2026-08-27", "2026-09-02")).rejects.toThrow("Weather data unavailable");

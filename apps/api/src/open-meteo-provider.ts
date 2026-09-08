@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { RawWeather } from "./display-service.js";
-const dailySchema = z.strictObject({ daily: z.strictObject({ time: z.array(z.string()), temperature_2m_max: z.array(z.number().finite().nullable()), precipitation_probability_max: z.array(z.number().finite().nullable()) }) });
+const dailySchema = z.object({ daily: z.strictObject({ time: z.array(z.string()), temperature_2m_max: z.array(z.number().finite().nullable()), precipitation_probability_max: z.array(z.number().finite().nullable()) }) });
 export type Fetcher = (input: string | URL, init?: RequestInit) => Promise<Response>;
 export class OpenMeteoProvider {
   constructor(private readonly latitude: number, private readonly longitude: number, private readonly fetcher: Fetcher = fetch) {}
