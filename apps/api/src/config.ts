@@ -24,7 +24,15 @@ const schema = z.object({
   GOOGLE_CALENDAR_FAMILY: requiredText, GOOGLE_CALENDAR_BAES: requiredText,
   EVENT_ID_SALT: requiredText,
   CALENDAR_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(300_000),
-  WEATHER_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(1_800_000)
+  WEATHER_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(1_800_000),
+  MEAL_CACHE_TTL_MS: z.coerce.number().int().nonnegative().default(300_000),
+  SOUS_MEALS_URL: z.string().url().refine((value) => new URL(value).protocol === "https:").optional(),
+  SOUS_MEALS_TOKEN: requiredText.optional(),
+  MORNING_QUOTE_URL: z.string().url().refine((value) => new URL(value).protocol === "https:").optional(),
+  MORNING_QUOTE_TOKEN: requiredText.optional()
+}).superRefine((data, context) => {
+  if (Boolean(data.SOUS_MEALS_URL) !== Boolean(data.SOUS_MEALS_TOKEN)) context.addIssue({ code: "custom", message: "Sous URL and token must be configured together" });
+  if (Boolean(data.MORNING_QUOTE_URL) !== Boolean(data.MORNING_QUOTE_TOKEN)) context.addIssue({ code: "custom", message: "Morning quote URL and token must be configured together" });
 });
 export type CalendarMapping = { calendarId: string; defaultGroup: Group };
 export type ServerConfig = ReturnType<typeof parseConfig>;
@@ -39,5 +47,7 @@ export function parseConfig(env: Record<string, string | undefined>) {
   if (new Set(calendars.map(({ calendarId }) => calendarId)).size !== calendars.length) throw new Error("Invalid server configuration");
   return { host: data.HOST, port: data.PORT, timezone: data.APP_TIMEZONE, latitude: data.DISPLAY_LATITUDE, longitude: data.DISPLAY_LONGITUDE,
     google: { clientId: data.GOOGLE_CLIENT_ID, clientSecret: data.GOOGLE_CLIENT_SECRET, refreshToken: data.GOOGLE_REFRESH_TOKEN }, calendars,
-    eventIdSalt: data.EVENT_ID_SALT, calendarTtlMs: data.CALENDAR_CACHE_TTL_MS, weatherTtlMs: data.WEATHER_CACHE_TTL_MS };
+    sous: data.SOUS_MEALS_URL && data.SOUS_MEALS_TOKEN ? { url: data.SOUS_MEALS_URL, token: data.SOUS_MEALS_TOKEN } : undefined,
+    morningQuote: data.MORNING_QUOTE_URL && data.MORNING_QUOTE_TOKEN ? { url: data.MORNING_QUOTE_URL, token: data.MORNING_QUOTE_TOKEN } : undefined,
+    eventIdSalt: data.EVENT_ID_SALT, calendarTtlMs: data.CALENDAR_CACHE_TTL_MS, weatherTtlMs: data.WEATHER_CACHE_TTL_MS, mealTtlMs: data.MEAL_CACHE_TTL_MS };
 }

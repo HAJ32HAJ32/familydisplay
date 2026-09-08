@@ -23,6 +23,10 @@ npm run build
 
 Create a root-readable or service-user-readable environment file outside the repository using the names in `.env.example`. Replace all placeholders, restrict its permissions, and never place OAuth credentials or calendar IDs in a systemd unit or command line.
 
+Sous integration is optional. To enable it, deploy Sous's `displayMeals` function, then set both `SOUS_MEALS_URL` and `SOUS_MEALS_TOKEN` in the protected environment file. The token must be a separate random value used only for this feed. Family Display rejects partial configuration, cross-origin redirects, malformed responses, duplicate dates, meals outside its requested seven-day range, and responses larger than 64 KiB. If Sous is unavailable, cached meals remain visible where available; otherwise calendar and weather data remain visible and the board is marked stale.
+
+Morning Quote integration is also optional. Set both `MORNING_QUOTE_URL` and `MORNING_QUOTE_TOKEN` in the protected environment file. The endpoint must use HTTPS and accept a read-only `GET` with only a `date=YYYY-MM-DD` query parameter and a dedicated bearer token. It must return `{ "text": "…", "attribution": "…" }`; Family Display rejects redirects, credentials embedded in URLs, malformed or oversized responses, and never sends calendar, meal, location, or household data to the quote service. Quote failure leaves the rest of the board visible and marks the data stale.
+
 ## Example systemd user service
 
 Adjust the working directory and environment-file path for the release location:
