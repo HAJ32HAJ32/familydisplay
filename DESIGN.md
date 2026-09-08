@@ -9,32 +9,32 @@ colors:
   text: "#F8FAFC"
   muted: "#B4C0D2"
   accent: "#42C8F5"
-  grape: "#A47AE2"
-  blueberry: "#5484ED"
-  basil: "#51B749"
-  graphite: "#616161"
-  banana: "#FBD75B"
-  tangerine: "#FFB878"
+  grape: "#B68FEC"
+  blueberry: "#75A0F5"
+  basil: "#68C463"
+  graphite: "#465166"
+  banana: "#EACB62"
+  tangerine: "#EFA766"
 typography:
   display:
     fontFamily: Inter
-    fontSize: 5.4vw
+    fontSize: 6.05vw
     fontWeight: 300
     lineHeight: 0.9
     letterSpacing: "-0.05em"
   title:
     fontFamily: Inter
-    fontSize: 1.4vw
+    fontSize: 1.57vw
     fontWeight: 650
     lineHeight: 1.15
   body:
     fontFamily: Inter
-    fontSize: 1vw
+    fontSize: 1.12vw
     fontWeight: 400
     lineHeight: 1.3
   label:
     fontFamily: Inter
-    fontSize: 0.72vw
+    fontSize: 0.81vw
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "0.06em"
@@ -97,11 +97,11 @@ A dark, stable television dashboard designed for a five-second glance across a r
 
 ## Colors
 
-The six event colours preserve the established Google Calendar mapping. Filled pills use deep ink text except Graphite, which uses light text. Cyan is reserved for weather and date emphasis rather than household identity.
+The six event colours preserve the established Google Calendar mapping while using tuned chroma and luminance for television viewing. Every foreground/background pair reaches at least 7:1 contrast: filled pills use deep ink text except Graphite, which uses light text. Time, location and title text remain fully opaque; the inverse group badge gives the identity label a distinct colour hierarchy without relying on hue alone. Cyan is reserved for weather and date emphasis rather than household identity.
 
 ## Typography
 
-Use weight, size and restrained uppercase labels to establish hierarchy. Never reduce primary TV text merely to fit more content; truncate exceptional content predictably instead.
+Use weight, size and restrained uppercase labels to establish hierarchy. The shared label, small, body, title and display steps are approximately 12% larger than the first deployed integrated-card release. Never reduce primary TV text merely to fit more content; truncate exceptional content predictably instead.
 
 ## Layout
 
