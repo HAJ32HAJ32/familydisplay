@@ -2,7 +2,7 @@
 
 ## 1. Product status
 
-Family Display is a shipped read-only household kiosk, not a prospective scaffold. Commit `7d1e066c405f1389c4d7b2647287fc8e8b126643` is the deployed pre-change baseline as verified on 9 September 2026. The hierarchy and compact all-day work in this unreleased branch/candidate follows that commit and must not be described as deployed until it passes the normal release and physical-display gates; this document is not deployment evidence.
+Family Display is a shipped read-only household kiosk, not a prospective scaffold. The hierarchy and compact all-day behaviour described here are implemented and browser-verified. Deployment identity must be read from the live checkout and systemd user service; this document is not deployment evidence.
 
 Work shipped by the baseline includes:
 
@@ -15,7 +15,7 @@ Work shipped by the baseline includes:
 - the dominant Today, top-right rail and six-card desktop composition;
 - permanent calendar key, filled high-contrast event pills and deterministic visible overflow.
 
-Still deferred are chores/rewards, calendar editing, event modals, touchscreen interaction, user accounts, settings and admin UI. Physical Raspberry Pi/TV acceptance for the visual changes in this unreleased branch/candidate is outstanding.
+Still deferred are chores/rewards, calendar editing, event modals, touchscreen interaction, user accounts, settings and admin UI. Physical Raspberry Pi/TV acceptance for the visual changes is outstanding.
 
 ## 2. Architecture and privacy boundary
 
@@ -154,4 +154,4 @@ Desktop hierarchy rules are source-tested. Candidate-browser verification with a
 
 The deployment host builds and runs the same-origin service as the systemd user service `family-display.service` on the private Tailscale address `100.72.212.14:3000`. Release verification must read back the user-service state, listener address, `/healthz`, `/`, `/api/today`, stale recovery and the exact commit before the Pi is repointed or restarted. Use `curl --max-time 10` for `/healthz` and `/`, and `curl --max-time 20` for `/api/today`.
 
-Do not infer deployment from a passing branch build. The deployed baseline remains `7d1e066` until operations explicitly releases and verifies a later commit.
+Do not infer deployment from a passing branch build or from this record. Read back the exact live checkout, user-service state and listener after every release.

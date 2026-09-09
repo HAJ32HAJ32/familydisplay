@@ -2,7 +2,7 @@
 
 Family Display is a shipped, read-only household kiosk. Its dominant Today panel shares the top row with a top-right rail containing the permanent calendar key and quiet Previous day context; six compact upcoming-day cards span the lower row. Previous day is events-only. Today and the six upcoming dates each combine calendar events, Open-Meteo conditions, a server-derived outfit suggestion and, when configured, Sous dinner data. Today can also include an optional morning quote.
 
-Commit `7d1e066` is the deployed pre-change baseline. Changes after that commit, including the hierarchy and compact all-day layout work in this unreleased branch/candidate, are not deployed until the normal release process is completed; this documentation is not deployment evidence.
+Deployment status must be established from the live user service and checkout, not inferred from repository documentation or a passing branch build. The dated operator evidence and release procedure live in [`docs/deployment.md`](docs/deployment.md).
 
 ## Current behaviour
 
@@ -52,7 +52,7 @@ The Fastify service serves the production React build and API from one origin:
 - `/api/today` — schema-validated display payload
 - `/healthz` — shallow process health (`{"status":"ok"}`)
 
-The deployed `7d1e066` baseline is operated by an active systemd user service on the VPS and listens directly on the Tailscale address `100.72.212.14:3000`. See [`docs/deployment.md`](docs/deployment.md); that private address is an operating detail, not permission to expose port 3000 publicly. This unreleased branch and its documentation are not evidence that the candidate has been deployed.
+Production is operated by a systemd user service on the VPS and listens directly on the Tailscale address `100.72.212.14:3000`. See [`docs/deployment.md`](docs/deployment.md); that private address is an operating detail, not permission to expose port 3000 publicly. Read back the live checkout and service state for the current release identity.
 
 ## Development
 

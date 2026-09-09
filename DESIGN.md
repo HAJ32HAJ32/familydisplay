@@ -104,7 +104,7 @@ components:
 
 Family Display is a dark, stable television dashboard designed for a five-second glance. The main desktop composition is a dominant Today card, a top-right rail containing the permanent calendar key above Previous day, and six equal upcoming-day cards across the lower row. Previous day is events-only. Today and the six upcoming dates own their weather, outfit, events and optional dinner. An optional morning quote sits inside Today rather than becoming another panel.
 
-Commit `7d1e066` is the deployed pre-change baseline. This design records the hierarchy and compact-event corrections in this unreleased branch/candidate; the document itself is not evidence that those changes are deployed.
+This design records the implemented hierarchy and compact-event behaviour. Deployment identity is established from the live checkout and user service, not from this document.
 
 ## Colors
 
