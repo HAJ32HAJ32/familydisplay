@@ -13,16 +13,16 @@
   --space-12: 3rem;
 
   /* Deliberate type hierarchy */
-  --text-label: clamp(1.125rem, 1.2vw, 1.375rem);
-  --text-small: clamp(1.25rem, 1.375vw, 1.5625rem);
-  --text-body: clamp(1.5rem, 1.675vw, 1.875rem);
-  --text-title: clamp(1.875rem, 2.35vw, 2.6875rem);
-  --text-display: clamp(5.5rem, 9vw, 10rem);
+  --text-label: clamp(1rem, 1.05vw, 1.2rem);
+  --text-small: clamp(1.1rem, 1.2vw, 1.375rem);
+  --text-body: clamp(1.3125rem, 1.465vw, 1.625rem);
+  --text-title: clamp(1.625rem, 2.05vw, 2.35rem);
+  --text-display: clamp(5rem, 8vw, 9rem);
 
-  /* Local icon scale: 75% larger than the first TV release */
-  --icon-sm: 1.75rem;
-  --icon-md: 2.625rem;
-  --icon-lg: 3.5rem;
+  /* Local icon hierarchy */
+  --icon-sm: 1.5rem;
+  --icon-md: 2rem;
+  --icon-lg: 4.5rem;
 
   /* Surfaces and semantic text */
   --background: #0b1322;
@@ -78,7 +78,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 .display-board {
   display: grid;
-  grid-template-rows: minmax(0, 1.45fr) minmax(0, 0.85fr);
+  grid-template-rows: minmax(0, 1.3fr) minmax(0, 0.9fr);
   gap: var(--space-4);
   width: 100%;
   height: 100vh;
@@ -206,12 +206,13 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   align-items: center;
   gap: var(--space-3);
   color: var(--muted);
-  font-size: var(--text-small);
+  font-size: var(--text-body);
 }
 
 .weather--compact {
   grid-template-columns: auto minmax(0, 1fr);
   gap: var(--space-2);
+  font-size: var(--text-label);
 }
 
 .weather--missing {
@@ -227,10 +228,12 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 .weather__reading strong {
   color: var(--text);
-  font-size: clamp(2.125rem, 3vw, 3.375rem);
+  font-size: clamp(2.25rem, 3.2vw, 3.5rem);
   font-weight: 650;
   line-height: 1;
 }
+
+.weather--compact .weather__reading strong { font-size: var(--text-body); }
 
 .weather__reading span {
   overflow: hidden;
@@ -253,12 +256,17 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   background: rgba(8, 19, 35, 0.5);
 }
 
+.outfit span { font-size: var(--text-body); font-weight: 700; }
+
 .weather--compact .outfit {
   padding: var(--space-1) 0;
   border: 0;
   color: var(--muted);
   background: transparent;
+  font-size: var(--text-label);
 }
+
+.weather--compact .outfit span { font-size: inherit; font-weight: inherit; }
 
 .icon {
   width: var(--icon-md);
@@ -268,6 +276,8 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 .icon--weather { width: var(--icon-lg); height: var(--icon-lg); color: var(--accent); }
 .weather--compact .icon--weather { width: var(--icon-md); height: var(--icon-md); }
 .icon--outfit, .icon--meal { width: var(--icon-sm); height: var(--icon-sm); }
+.outfit .icon--outfit { width: var(--icon-md); height: var(--icon-md); }
+.weather--compact .icon--outfit { width: var(--icon-sm); height: var(--icon-sm); }
 
 .event-list {
   display: grid;
@@ -326,6 +336,10 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 .event-list--compact .event__body { grid-column: 1 / -1; grid-row: 2; }
 .event-list--compact .event__group { grid-column: 2; grid-row: 1; }
+.event-list--compact .event--all-day { grid-template-columns: auto minmax(0, 1fr) auto; }
+.event-list--compact .event--all-day .event__time { grid-column: 1; grid-row: 1; }
+.event-list--compact .event--all-day .event__body { grid-column: 2; grid-row: 1; overflow: hidden; }
+.event-list--compact .event--all-day .event__group { grid-column: 3; grid-row: 1; }
 
 .event__time {
   color: var(--event-ink);

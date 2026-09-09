@@ -292,6 +292,37 @@ describe("Family Display", () => {
     expect(screen.getByText("+1 more")).toBeVisible();
   });
 
+  it("keeps a long compact all-day event title in the same bounded row as its dash", async () => {
+    const longTitle = "A very long future all-day event title that must remain visible within its compact card";
+    const withLongAllDayEvent = {
+      ...payload,
+      days: payload.days.map((day, dayIndex) => dayIndex === 1
+        ? {
+            ...day,
+            events: [{
+              id: "evt_long_all_day",
+              title: longTitle,
+              start: "2026-08-28T00:00:00+01:00",
+              end: "2026-08-29T00:00:00+01:00",
+              allDay: true,
+              group: "all" as const,
+              location: "",
+            }],
+          }
+        : day),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(withLongAllDayEvent));
+
+    render(<App />);
+
+    const event = await screen.findByLabelText(`Everyone: ${longTitle}, All day`);
+    expect(event).toHaveClass("event--all-day");
+    expect(event).toHaveAccessibleName(/All day/);
+    expect(event.querySelector(".event__time--all-day")).toHaveTextContent("—");
+    expect(event.querySelector(".event__time--all-day")).toHaveAttribute("aria-hidden", "true");
+    expect(within(event).getByText(longTitle)).toBeVisible();
+  });
+
   it("renders the morning quote inside today's primary panel", async () => {
     const withQuote = { ...payload, morningQuote: { text: "Do the work in front of you.", attribution: "Marcus Aurelius" } };
     vi.mocked(fetch).mockResolvedValueOnce(response(withQuote));

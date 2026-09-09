@@ -1,754 +1,157 @@
-# Family Display implementation plan
+# Family Display implementation record
 
-## 1. Purpose and delivery boundary
+## 1. Product status
 
-Build a read-only, always-on household display hosted on the VPS and rendered by Chromium on the Raspberry Pi. The application shows yesterday, today, and the next six days, combining two source Google Calendars with event-colour-derived household groups, weather, and a server-generated outfit suggestion.
+Family Display is a shipped read-only household kiosk, not a prospective scaffold. Commit `7d1e066c405f1389c4d7b2647287fc8e8b126643` is the deployed pre-change baseline as verified on 9 September 2026. The hierarchy and compact all-day work in this unreleased branch/candidate follows that commit and must not be described as deployed until it passes the normal release and physical-display gates; this document is not deployment evidence.
 
-This plan covers the first useful production release: the web application and fixture from Phase 1, live calendar integration from Phase 2, the TV-oriented view from Phase 3, weather from Phase 4, and browser/server resilience from Phase 5.
+Work shipped by the baseline includes:
 
-Explicitly deferred:
+- npm-workspace TypeScript application with a shared Zod contract;
+- same-origin Fastify API and React/Vite production UI;
+- two read-only Google Calendar sources (Family and BAES), recurring-instance expansion and event-colour group mapping;
+- Open-Meteo conditions and server-side outfit guidance for Today and six future dates;
+- optional Sous meals and optional morning quote providers;
+- browser polling/cache recovery and server provider/payload fallback;
+- the dominant Today, top-right rail and six-card desktop composition;
+- permanent calendar key, filled high-contrast event pills and deterministic visible overflow.
 
-- Phase 6, meals from Sous. The API retains `meal: null` so this can be added without reshaping the day object.
-- Phase 7, chores and rewards.
-- Any calendar editing, event details modal, touchscreen interaction, user account system, settings screen, or admin UI.
-- Pi hardware setup already completed in Phase 0. Deployment documentation may describe the existing kiosk command, but application code must not manage the Pi.
+Still deferred are chores/rewards, calendar editing, event modals, touchscreen interaction, user accounts, settings and admin UI. Physical Raspberry Pi/TV acceptance for the visual changes in this unreleased branch/candidate is outstanding.
 
-## 2. Repository findings and assumptions
+## 2. Architecture and privacy boundary
 
-The repository contains only a three-line placeholder `README.md`. There is no existing framework, package convention, reusable component, deployment manifest, or test setup to preserve.
-
-The following choices therefore become the implementation contract for downstream work:
-
-- Use a Node.js TypeScript monorepo managed with npm workspaces.
-- Use React and Vite for the frontend.
-- Use Fastify for the HTTP server and provider integrations.
-- Use Zod schemas in a shared workspace package so fixture generation, backend output, and frontend parsing use the same runtime contract.
-- Keep the deployment as one same-origin service: Fastify serves the built frontend and `/api/*`. This avoids CORS, keeps the Pi URL stable, and makes the VPS deployment small.
-- Persist no calendar database. Keep bounded in-memory provider caches on the server and the last successful display payload in browser `localStorage`.
-- Use `Europe/London` as the authoritative timezone. The browser clock never decides which day is today.
-- Configure latitude and longitude on the server. Do not send a postcode to Open-Meteo or expose it to the browser.
-- Protect the service at the VPS/private-network layer, preferably using the existing Tailscale/private-access pattern. The application itself has no user login because it is a single-household, read-only kiosk. If private networking is unavailable, deployment must add an authenticated reverse-proxy gate before exposing household calendar data; an unprotected public URL is not acceptable.
-- The placeholder project name remains “Family Display” in code and copy until a final name is chosen.
-
-Suggested initial structure:
+The repository contains three npm workspaces:
 
 ```text
-/
-  apps/
-    api/                 # Fastify server, providers, aggregation, static serving
-    web/                 # React/Vite kiosk interface
-  packages/
-    contract/            # Zod schemas, TypeScript types, fixed group values
-  fixtures/
-    today.json           # deterministic Phase 1 fixture
-  docs/
-    implementation-plan.md
-    deployment.md
-  package.json
-  tsconfig.base.json
+apps/api/          Fastify server, providers, aggregation and static serving
+apps/web/          React/Vite kiosk UI
+packages/contract/ shared Zod schemas, types and canonical fixture
 ```
 
-## 3. Frontend/backend boundary
+The server owns OAuth, raw Family/BAES IDs, Google colour mapping, Open-Meteo coordinates, Europe/London date boundaries, recurrence expansion, sorting, outfit rules, optional provider credentials and response validation. The browser receives only the normalized display contract.
 
-### Server owns
+The browser owns loading/unavailable/rendered states, responsive presentation, five-minute polling, ten-second request timeout, schema validation, freshness display, the last-good snapshot and daily recovery reload. It must not calculate authoritative dates/groups/outfits or contact providers directly.
 
-- Google OAuth credentials and refresh token.
-- The Family and BAES Google Calendar IDs, source defaults, and event-colour mapping to the six public group values.
-- Open-Meteo location and requests.
-- Europe/London date boundaries, daylight-saving offsets, rolling-window calculation, weekday labels, `isToday`, sorting, filtering, and outfit rules.
-- Expansion of recurring calendar events into occurrences.
-- Normalisation and validation of the complete response.
-- Short provider caches and stale fallback when upstream services fail.
-- Serving the production frontend from the same origin.
+The application has no login. Deployment privacy is enforced by the systemd user service plus the private Tailscale listener currently at `100.72.212.14:3000`. Wildcard, public, hostname and ordinary LAN binds are rejected. Household data must not be exposed on an unauthenticated public URL.
 
-### Frontend owns
+## 3. Current data contract
 
-- Fetching and runtime-validating the already-normalised payload.
-- Rendering the hierarchy: quiet yesterday, dominant today, six normal future days.
-- Group colour tokens and accessible non-colour markers.
-- Polling, retaining the last successful payload, staleness presentation, and daily controlled reload.
-- TV-safe layout, overscan padding, typography, responsive fallback, and hidden cursor.
+`GET /api/today` returns a strict `DisplayPayload`:
 
-### Frontend must not
+- offset-aware `generatedAt`;
+- `timezone: "Europe/London"`;
+- `morningQuote`, either a validated quote or `null`;
+- a separate `yesterday` date with sorted events;
+- exactly seven ordered `days`, Today first, each with weather or `null`, events and a meal or `null`.
 
-- Hold OAuth credentials, raw calendar IDs, email addresses, postcode, latitude, or longitude.
-- Calculate date ranges, weekdays, British Summer Time, group assignment, event order, or outfit suggestions.
-- Mutate calendars or retry providers directly.
-- Treat the Pi's local date as authoritative.
+An event contains an opaque ID, bounded title/location, offset-aware start/end, `allDay` and one group. A weather summary contains temperature, precipitation chance, Open-Meteo condition and outfit. A meal is a dated recipe title, takeaway or eating-out value. The morning quote has bounded text and attribution.
 
-## 4. User flows
+The API uses `Cache-Control: no-store` and `X-Data-Stale` to distinguish fresh from fallback payloads. `/healthz` is shallow and provider-independent. Errors are redacted; raw provider bodies, tokens, calendar IDs, coordinates, attendee data and descriptions are never returned.
 
-There is one primary user: a household member glancing at a non-interactive wall display.
+## 4. Calendar behaviour
 
-### Flow A: first successful load
+Exactly two calendars are configured:
 
-1. Chromium opens the application URL in kiosk mode.
-2. The page shows a dark full-screen loading shell, not an empty white page.
-3. The frontend requests `GET /api/today`.
-4. The frontend validates the response against the shared schema.
-5. The display renders yesterday, today, and six future days.
-6. The valid payload and receipt time are stored as the last-known-good snapshot.
-7. A quiet “Updated HH:mm” indicator is shown.
+- Family defaults to `all`;
+- BAES defaults to `h-and-chantele`.
 
-### Flow B: background refresh succeeds
+Recognized event `colorId` values override the source default:
 
-1. While visible, the page polls `GET /api/today` every five minutes.
-2. A valid response atomically replaces the rendered payload; no blank intermediate state is shown.
-3. The browser cache and updated timestamp are replaced.
-4. If the date window changed at midnight, the new server-provided yesterday/today arrangement is rendered without client date maths.
+| Google colour | ID | Display group |
+| --- | --- | --- |
+| Grape | `3` | H + Chantele |
+| Blueberry | `9` | All |
+| Basil | `10` | Rafe |
+| Graphite | `8` | H |
+| Banana | `5` | Chantele |
+| Tangerine | `6` | Household |
 
-### Flow C: refresh fails after previous success
+The adapter uses `calendar.readonly`, expanded recurring events and pagination. Cancelled and self-declined events are removed; blank titles become `Untitled event`. Events are assigned to every local day they overlap and sorted all-day first, then by start, end, title and opaque ID.
 
-1. A request fails, times out, returns a non-2xx status, or returns a body that fails schema validation.
-2. The last rendered valid payload remains on screen.
-3. The timestamp changes to a quiet stale treatment: “Last updated HH:mm · offline”.
-4. Polling continues on the normal interval. A later valid response clears the stale state.
+## 5. Weather, outfit, meals and quote
 
-### Flow D: cold start while offline
+Open-Meteo is called server-side with configured coordinates and `timezone=Europe/London`. It provides daily maximum temperature, precipitation probability and condition for the seven display dates. Missing forecast dates become `weather: null` without removing calendar content.
 
-1. The live request fails.
-2. If a valid `localStorage` snapshot exists, render it and mark it stale.
-3. If no valid snapshot exists, render a full-screen unavailable state with plain household-safe copy and automatic retry; never expose stack traces, provider names, tokens, calendar IDs, or raw error bodies.
+Outfit selection is precipitation-first:
 
-### Flow E: upstream partial failure
+1. precipitation chance over 50% → raincoat;
+2. otherwise temperature over 20°C → T-shirt;
+3. otherwise at least 14°C → long sleeve;
+4. otherwise at least 8°C → hoodie;
+5. otherwise → coat.
 
-- If Google Calendar fails but a prior server calendar snapshot exists, the server returns the prior complete display payload with `X-Data-Stale: true`.
-- If weather fails but calendar data is available, the server returns the current calendar window and uses cached weather where available; otherwise `weather` is `null` for affected days.
-- The display remains usable and marks the response stale when the server declares it stale.
+Sous meals are shipped but optional. When both URL and token are configured, the server requests the explicit seven-day range and accepts recipe, takeaway and eating-out values. The morning quote is also shipped but optional and receives only Today’s date. Missing configuration leaves those fields empty. On a same-date quote refresh failure, an available cached quote is retained and marked stale; without a cached quote, the quote is omitted and the board remains usable but stale. Other provider failures use cached data where possible and mark the aggregate stale.
 
-### Flow F: daily browser recovery
+Open-Meteo, Sous and morning-quote responses use the 65,536-byte bounded JSON reader and runtime response schemas. Each Google Calendar request has a ten-second timeout and requests at most 2,500 occurrences per page, but pagination follows `nextPageToken` without a maximum total page count. Google upstream responses are not byte-capped or runtime-schema-validated at that boundary. Every provider is normalized into an aggregate payload that must pass the shared display contract. Concurrent refreshes are coalesced; default TTLs are calendar five minutes, weather thirty minutes, Sous five minutes and quote six hours.
 
-1. Between 03:00 and 03:15 Europe/London, the frontend schedules one full page reload.
-2. Store the local date of the last daily reload so rerenders or a clock adjustment cannot create a reload loop.
-3. Normal polling resumes after reload.
+## 6. Current user interface
 
-There are no navigation flows, forms, editable controls, hover-only interactions, or success toasts in this release.
+### Desktop/TV composition
 
-## 5. Screens and visual states
+The viewport-locked desktop board contains:
 
-### 5.1 Main display
+1. a top row with the dominant Today card on the left;
+2. a top-right rail with Calendar key/freshness above Previous day;
+3. a lower row of six equal upcoming-day cards.
 
-One route, `/`, with:
+The revised desktop row allocation is `minmax(0, 1.3fr) minmax(0, 0.9fr)`. At 900px and below the sections enter normal document flow and may scroll for development access.
 
-- A reduced-weight yesterday strip/card for context.
-- A dominant today card.
-- Six future day cards in chronological order.
-- Event rows showing time (or “All day”), title, optional location, and group identity.
-- Today's maximum temperature, precipitation chance, and outfit label/icon when weather exists.
-- A small updated/stale indicator.
-- No visible browser-like navigation or interactive chrome.
+Today contains the long date, prominent weather/temperature/outfit, schedule, optional dinner and optional quote. Future cards contain compact date-specific weather/outfit, dinner and event content. Today’s weather body text, 72px icon, `clamp(2.25rem, 3.2vw, 3.5rem)` temperature and body/700 outfit guidance are materially larger than compact label text, 32px weather icon, body temperature and 24px outfit icon.
 
-The exact grid may adapt to the TV resolution, but information hierarchy is fixed. At the target TV resolution, all eight day sections must fit without vertical or horizontal scrolling.
+The shared responsive type tokens are:
 
-### 5.2 Loading state
-
-- Uses the same dark background and reserved layout regions as the main display.
-- Shows a restrained loading label or skeleton.
-- Does not flash a white document background.
-- Is replaced only after a payload passes runtime validation.
-
-### 5.3 Empty-data state
-
-An empty day is normal, not an error. Render “Nothing planned” or an equally concise label inside that day. The full eight-day structure remains visible.
-
-### 5.4 Unavailable state
-
-Used only when both the live request and a valid browser snapshot are unavailable. Show:
-
-- “Calendar temporarily unavailable”.
-- A quiet “Trying again…” line.
-- No manual action requirement, technical codes, stack trace, or blank screen.
-
-### 5.5 Stale state
-
-Keep the last good display fully visible. Reduce emphasis on the freshness line, not on the calendar itself. Example: “Last updated 18:42 · offline”. Do not replace the display with an error panel.
-
-### 5.6 Responsive/dev view
-
-Production targets a TV, but the page must remain inspectable on a laptop and phone:
-
-- TV/desktop: yesterday plus a multi-column day grid with today visually dominant.
-- Narrow viewport: stack day sections vertically and permit ordinary page scrolling for development only.
-- No content may overlap or become inaccessible at 320 CSS pixels wide.
-
-## 6. Domain entities
-
-### DisplayPayload
-
-A generated snapshot for one authoritative local date.
-
-- `generatedAt`: offset-aware instant at which this payload was assembled.
-- `timezone`: exactly `Europe/London` for this deployment.
-- `yesterday`: one `PastDay`.
-- `days`: exactly seven `DisplayDay` entries, today first.
-
-### PastDay
-
-- `date`: local calendar date.
-- `weekday`: short English weekday label.
-- `events`: sorted event occurrences.
-
-It deliberately has no `isToday`, `weather`, or `meal`.
-
-### DisplayDay
-
-- `date`: local calendar date.
-- `weekday`: short English weekday label.
-- `isToday`: true only for index 0.
-- `weather`: weather summary or `null`.
-- `events`: sorted event occurrences.
-- `meal`: `null` in this release, with the future meal union reserved in the contract.
-
-### EventOccurrence
-
-A single rendered occurrence, including an expanded instance of a recurring event.
-
-- `id`: stable opaque ID; never a raw email or calendar ID.
-- `title`: display-safe event title.
-- `start`, `end`: offset-aware ISO 8601 timestamps in Europe/London.
-- `allDay`: whether the source event is all-day.
-- `group`: one fixed household group.
-- `location`: a string, including an empty string when absent.
-
-For all-day events, normalise `start` to local midnight and `end` to the exclusive local midnight after the event. The UI renders “All day” and does not show those timestamps.
-
-### WeatherSummary
-
-- `tempMaxC`: finite Celsius number rounded to one decimal place.
-- `precipitationChance`: integer percentage from 0 through 100.
-- `outfit`: one fixed outfit value.
-
-### Meal
-
-Reserved for Phase 6:
-
-- `{ "type": "recipe", "title": string }`
-- `{ "type": "out" }`
-- `{ "type": "takeaway" }`
-
-All `meal` fields are `null` in the current release.
-
-## 7. Fixed values and business rules
-
-### Household groups
-
-The only accepted group values and their presentation tokens are:
-
-- `h-and-chantele`: purple; H and Chantele.
-- `all`: blue; H, Chantele, and Rafe.
-- `rafe`: green; Rafe.
-- `h`: grey; H.
-- `chantele`: pink/red; Chantele.
-- `household`: tangerine; household events such as the cleaner.
-
-Configure exactly two source calendars. `GOOGLE_CALENDAR_FAMILY` defaults events to `all`; `GOOGLE_CALENDAR_BAES` defaults events to `h-and-chantele`. For either source, recognised Google event `colorId` values override that default: grape (`3`) → `h-and-chantele`, blueberry (`9`) → `all`, basil (`10`) → `rafe`, graphite (`8`) → `h`, banana (`5`) → `chantele`, and tangerine (`6`) → `household`. Missing or unsupported colour IDs retain the source default. The display includes a slim permanent legend along its bottom edge using the Google colour names and resulting display groups. Duplicate or missing source calendar IDs fail configuration/startup. The response never exposes colour IDs, human-readable member descriptions, email addresses, or calendar IDs.
-
-Colour cannot be the only group cue. Each event row must also expose a short visible label or shape marker, and an accessible label containing the group name.
-
-### Rolling window
-
-- Calculate all boundaries in `Europe/London` using a timezone-aware library.
-- `yesterday.date` is one local day before today.
-- `days` contains exactly today through today plus six days, ascending and without gaps or duplicates.
-- `days[0].isToday` is true; every other entry is false.
-- `weekday` is derived server-side from `date` and uses `Mon` through `Sun`.
-- Query event instances from yesterday at 00:00 inclusive through the day after `days[6]` at 00:00 exclusive.
-- An event belongs to each day it overlaps. A multi-day event may therefore produce an occurrence in more than one day; clip only for grouping, not by rewriting its original start/end values.
-
-### Calendar filtering and normalisation
-
-- Use Google Calendar read-only scope only.
-- Request expanded recurring instances (`singleEvents=true`) within the server-calculated range.
-- Exclude events whose Google status is `cancelled`.
-- Exclude an event when the authorised user's own attendee response is `declined`.
-- Include tentative events; the first release has no tentative visual distinction.
-- Treat missing or blank summaries as `Untitled event`.
-- Trim title and location whitespace.
-- Do not include descriptions, attendee lists, organiser details, conferencing links, attachments, or private extended properties.
-- Preserve simultaneous events; do not merge them.
-- Sort all-day events first, then timed events by start instant, then end instant, then title, then opaque ID for deterministic ties.
-
-### Outfit rule
-
-Evaluate precipitation before temperature, server-side, using the unrounded Open-Meteo values:
-
-1. `precipitationChance > 50` → `raincoat`.
-2. Otherwise `tempMaxC > 20` → `tshirt`.
-3. Otherwise `tempMaxC >= 14` → `long-sleeve`.
-4. Otherwise `tempMaxC >= 8` → `hoodie`.
-5. Otherwise → `coat`.
-
-The original brief calls the thresholds a starting point. These exact edge rules remove implementation ambiguity for the first release; tune them later through configuration after real-world observation.
-
-### Caching and freshness
-
-- Server calendar cache target TTL: five minutes.
-- Server weather cache target TTL: thirty minutes.
-- Coalesce concurrent refreshes so multiple browser requests trigger at most one provider request per cache key.
-- Keep the last complete schema-valid display payload in memory for stale fallback.
-- Browser poll interval: five minutes, beginning after the first request settles.
-- Browser request timeout: ten seconds.
-- Browser retains only the latest schema-valid payload in `localStorage` under a versioned key.
-- A stale payload is preferable to a blank screen. Do not impose an automatic age cutoff that hides cached data; always show its timestamp.
-
-## 8. HTTP API and shared data contract
-
-### `GET /api/today`
-
-No query parameters. No request body. Same-origin/private-network access only.
-
-Success response:
-
-- Status `200`.
-- `Content-Type: application/json`.
-- `Cache-Control: no-store` so browser/proxy caches do not compete with application freshness logic.
-- `X-Data-Stale: false` for a newly assembled/provider-cache-valid payload.
-- `X-Data-Stale: true` when the server returns a last-known-good payload because one or more required provider refreshes failed.
-- Body conforms to `DisplayPayload`.
-
-Canonical example fixture:
-
-```json
-{
-  "generatedAt": "2026-08-27T18:42:00+01:00",
-  "timezone": "Europe/London",
-  "yesterday": {
-    "date": "2026-08-26",
-    "weekday": "Wed",
-    "events": [
-      {
-        "id": "evt_9f01",
-        "title": "Bins out",
-        "start": "2026-08-26T07:00:00+01:00",
-        "end": "2026-08-26T07:15:00+01:00",
-        "allDay": false,
-        "group": "h",
-        "location": ""
-      }
-    ]
-  },
-  "days": [
-    {
-      "date": "2026-08-27",
-      "weekday": "Thu",
-      "isToday": true,
-      "weather": {
-        "tempMaxC": 19,
-        "precipitationChance": 65,
-        "outfit": "raincoat"
-      },
-      "events": [
-        {
-          "id": "evt_a1b2c3",
-          "title": "Nursery drop-off",
-          "start": "2026-08-27T08:30:00+01:00",
-          "end": "2026-08-27T09:00:00+01:00",
-          "allDay": false,
-          "group": "rafe",
-          "location": ""
-        }
-      ],
-      "meal": null
-    },
-    {
-      "date": "2026-08-28",
-      "weekday": "Fri",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    },
-    {
-      "date": "2026-08-29",
-      "weekday": "Sat",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    },
-    {
-      "date": "2026-08-30",
-      "weekday": "Sun",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    },
-    {
-      "date": "2026-08-31",
-      "weekday": "Mon",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    },
-    {
-      "date": "2026-09-01",
-      "weekday": "Tue",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    },
-    {
-      "date": "2026-09-02",
-      "weekday": "Wed",
-      "isToday": false,
-      "weather": null,
-      "events": [],
-      "meal": null
-    }
-  ]
-}
+```css
+--text-label: clamp(1rem, 1.05vw, 1.2rem);
+--text-small: clamp(1.1rem, 1.2vw, 1.375rem);
+--text-body: clamp(1.3125rem, 1.465vw, 1.625rem);
+--text-title: clamp(1.625rem, 2.05vw, 2.35rem);
+--text-display: clamp(5rem, 8vw, 9rem);
 ```
 
-Schema constraints:
+### Event capacity and semantics
 
-```ts
-type Group =
-  | "h-and-chantele"
-  | "all"
-  | "rafe"
-  | "h"
-  | "chantele"
-  | "household";
+Today renders at most three event rows. Previous day and each upcoming card render at most one. Hidden valid events are represented deterministically as `+N more`; they are not silently CSS-clipped.
 
-type Outfit =
-  | "tshirt"
-  | "long-sleeve"
-  | "hoodie"
-  | "coat"
-  | "raincoat";
+Timed compact events retain the existing two-row treatment. An all-day event renders a visible em dash with `aria-hidden="true"`, while the event row’s accessible label contains “All day”. Compact all-day events carry `event--all-day` and use one grid row with `auto minmax(0, 1fr) auto` columns for dash, bounded title/body and group badge. The title remains in the DOM and ellipsizes within the card.
 
-type Meal =
-  | { type: "recipe"; title: string }
-  | { type: "out" }
-  | { type: "takeaway" };
+## 7. Resilience model
 
-type EventOccurrence = {
-  id: string;
-  title: string;
-  start: string;
-  end: string;
-  allDay: boolean;
-  group: Group;
-  location: string;
-};
+The browser:
 
-type WeatherSummary = {
-  tempMaxC: number;
-  precipitationChance: number;
-  outfit: Outfit;
-};
+- polls `/api/today` every five minutes;
+- aborts a request after ten seconds;
+- atomically replaces the board only after schema validation;
+- stores the latest valid snapshot as `family-display:last-good:v2`;
+- migrates eligible v1 data, removing unsupported old weather/quote fields safely;
+- keeps the previous board visible and shows `Last updated HH:mm · offline` after a failed refresh;
+- reloads once daily between 03:00 and 03:15 Europe/London.
 
-type DisplayDay = {
-  date: string;
-  weekday: "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
-  isToday: boolean;
-  weather: WeatherSummary | null;
-  events: EventOccurrence[];
-  meal: Meal | null;
-};
+The server:
 
-type DisplayPayload = {
-  generatedAt: string;
-  timezone: "Europe/London";
-  yesterday: {
-    date: string;
-    weekday: DisplayDay["weekday"];
-    events: EventOccurrence[];
-  };
-  days: [DisplayDay, DisplayDay, DisplayDay, DisplayDay, DisplayDay, DisplayDay, DisplayDay];
-};
+- caches providers independently and coalesces concurrent refreshes;
+- uses stale provider values where possible;
+- retains the last complete schema-valid payload as final fallback;
+- returns a redacted `503` when neither live nor stale data exists.
+
+A stale payload is preferable to a blank screen and has no automatic browser age cutoff.
+
+## 8. Verification model
+
+Automated coverage includes shared-contract constraints, London date/DST windows, outfit thresholds, calendar filtering/sorting/mapping/pagination, bounded optional providers, cache/coalescing/fallback, API/static serving, frontend fetch/cache/recovery states, all groups, event limits, accessible all-day semantics and source-level layout tokens.
+
+Canonical repository gates are:
+
+```sh
+npm test
+npm run lint
+npm run typecheck
+npm run build
+git diff --check
 ```
 
-Runtime validation must additionally enforce:
+Desktop hierarchy rules are source-tested. Candidate-browser verification with a crowded local fixture confirmed board and scroll dimensions of exactly 1366×768, desktop rows of 416px and 288px, all six future cards fully inside the viewport with zero scroll excess, the compact all-day dash/body/group computed to grid row 1, and a visible ellipsized long title. Computed Today/compact hierarchy values were weather text 21/16px, icon 72/32px, temperature 43.712/21px and outfit 21/16px. Screenshot capture timed out, so screenshot-based aesthetic assessment remains unverified. Final acceptance still requires physical Raspberry Pi/TV checks for overscan, clipping, cursor behaviour, five-second viewing-distance readability, wake/reboot recovery, stale operation and midnight rollover.
 
-- Dates match `YYYY-MM-DD` and are real calendar dates.
-- Timestamps are ISO 8601 with an explicit `Z` or numeric offset; backend output for this deployment uses the Europe/London offset applying on that instant.
-- `end` is strictly after `start`.
-- `id` is non-empty and at most 200 characters.
-- `title` is 1–200 Unicode characters after trimming.
-- `location` is 0–300 Unicode characters after trimming.
-- Arrays are always present.
-- `days` has exactly seven items with consecutive dates and exactly one `isToday: true` at index 0.
-- `tempMaxC` is finite and within a defensive range of -50 through 60.
-- `precipitationChance` is an integer from 0 through 100.
-- Meal recipe title, when Phase 6 is enabled, is 1–200 characters.
-- Unknown object keys are stripped or rejected consistently; prefer strict schemas in tests and at the backend output boundary.
+## 9. Release boundary
 
-### Error response
+The deployment host builds and runs the same-origin service as the systemd user service `family-display.service` on the private Tailscale address `100.72.212.14:3000`. Release verification must read back the user-service state, listener address, `/healthz`, `/`, `/api/today`, stale recovery and the exact commit before the Pi is repointed or restarted. Use `curl --max-time 10` for `/healthz` and `/`, and `curl --max-time 20` for `/api/today`.
 
-When no schema-valid live or stale payload exists:
-
-```json
-{
-  "error": {
-    "code": "DISPLAY_DATA_UNAVAILABLE",
-    "message": "Display data is temporarily unavailable"
-  }
-}
-```
-
-- Status `503` for provider/configuration availability failures at request time.
-- Status `500` only for an unexpected internal error.
-- Never include upstream response bodies, stack traces, secrets, calendar IDs, coordinates, or OAuth details.
-- The frontend treats every non-2xx response identically for household-facing copy, while logging a concise code to the browser console for maintenance.
-
-### `GET /healthz`
-
-A shallow process health endpoint for deployment checks.
-
-```json
-{ "status": "ok" }
-```
-
-Return `200` when the process can serve requests. Do not call Google or Open-Meteo from this endpoint and do not expose configuration values.
-
-## 9. Provider contracts and configuration
-
-### Google Calendar adapter
-
-Input from application service:
-
-- `from`: inclusive timezone-aware start of yesterday.
-- `to`: exclusive timezone-aware start after the seventh display day.
-- Five configured `{ calendarId, group }` mappings.
-
-Output to application service:
-
-- Normalised `EventOccurrence[]` carrying enough local-date overlap information for server grouping.
-
-Required Google request behaviour:
-
-- Scope: `https://www.googleapis.com/auth/calendar.readonly` only.
-- `singleEvents=true`.
-- `timeMin` and `timeMax` are RFC 3339 instants corresponding to the Europe/London boundaries.
-- Follow pagination until `nextPageToken` is absent for every calendar.
-- Make the OAuth consent app “In production” before relying on the refresh token; “Testing” refresh tokens may expire after seven days.
-
-### Open-Meteo adapter
-
-Use the configured latitude and longitude and request daily maximum temperature and maximum precipitation probability for all seven display dates, with `timezone=Europe/London`.
-
-Output a map keyed by local `YYYY-MM-DD`. Missing provider days become `weather: null`; they do not remove calendar days.
-
-### Environment/configuration
-
-Expected server-only values:
-
-- `PORT`.
-- `APP_TIMEZONE=Europe/London`.
-- `DISPLAY_LATITUDE` and `DISPLAY_LONGITUDE`.
-- Google OAuth client ID, client secret, and refresh token.
-- Five explicit Google Calendar ID values, each bound to one fixed group.
-- Optional cache/poll tuning values with the defaults in this plan.
-
-Configuration validation occurs at process startup. Missing credentials, duplicate group mappings, duplicate calendar IDs, an unsupported timezone, or invalid coordinates fail startup with a redacted operator error. Secrets must not be committed, rendered, logged, or returned by an endpoint. Provide `.env.example` containing names and safe placeholders only.
-
-## 10. Frontend component plan
-
-Suggested component boundary:
-
-- `App`: selects loading, unavailable, or display state.
-- `DisplayBoard`: lays out the complete snapshot and freshness line.
-- `YesterdayPanel`: reduced-weight past context.
-- `TodayPanel`: prominent date, weather/outfit, and events.
-- `FutureDaysGrid`: six chronological day cards.
-- `DayCard`: shared date/empty/event rendering primitive with visual variant.
-- `EventList` and `EventRow`: deterministic event presentation.
-- `WeatherSummary`: display-only rendering of server decisions.
-- `FreshnessIndicator`: updated/stale wording.
-- `useDisplayData`: initial fetch, validation, polling, timeout, local cache, and atomic replacement.
-- `scheduleDailyReload`: isolated, testable reload scheduling.
-
-Presentation requirements:
-
-- Set `html`, `body`, and root background dark before React mounts.
-- Apply `* { cursor: none; }` in kiosk mode; allow a development override by environment or query flag.
-- Start TV body text at roughly 24–32 CSS pixels, with larger date and time hierarchy.
-- Reserve generous safe-area/overscan padding on all edges.
-- Use tabular numerals for times.
-- Truncate exceptionally long event text predictably rather than letting cards overlap; preserve full text in an accessible label.
-- Use semantic headings and lists even though the kiosk is not interactive.
-- Meet WCAG AA contrast for text and non-colour group markers.
-- Respect `prefers-reduced-motion`; avoid decorative animation and bright static blocks.
-- No auto-scrolling carousel. Information must remain stable during a glance.
-
-## 11. Backend module plan
-
-Suggested modules:
-
-- `config`: environment parsing and redacted startup validation.
-- `clock`: injectable current instant for deterministic midnight/DST tests.
-- `date-window`: Europe/London rolling dates and query boundaries.
-- `google-calendar-provider`: OAuth read-only API and pagination.
-- `open-meteo-provider`: forecast fetch and normalisation.
-- `event-normaliser`: privacy filtering, fallback titles, opaque IDs, and sorting.
-- `outfit`: pure threshold function.
-- `display-service`: combines providers into the contract and validates output.
-- `cache`: TTL, request coalescing, and last-known-good snapshot.
-- `routes/today`: HTTP response and stale header.
-- `routes/healthz`: shallow liveness.
-- `server`: static web assets, routes, redacted error handler, graceful shutdown.
-
-Opaque event IDs should be stable for a source occurrence without revealing raw calendar identity. A deterministic server-side hash of calendar ID, provider event ID, and occurrence start is suitable; return a short `evt_`-prefixed representation. The hashing salt, if used, remains server-side.
-
-## 12. Implementation sequence
-
-### Step 1: scaffold and shared contract
-
-- Add npm workspace structure, TypeScript base config, lint/format scripts, and test runners.
-- Implement strict shared schemas and types.
-- Create `fixtures/today.json` with yesterday plus seven days, invented events across at least three household groups, all-day and timed items, empty days, weather examples, and `meal: null`.
-- Add a contract test that validates the fixture.
-
-### Step 2: fixture-driven frontend
-
-- Build the single-route display against an injected data source returning the fixture.
-- Implement all visual states, TV layout, group treatments, and responsive fallback.
-- Verify at the target TV resolution and at 320-pixel width.
-- Deploy the fixture build and point the Pi kiosk at it for the planned two-day real-TV observation before polishing layout.
-
-### Step 3: calendar backend
-
-- Add startup configuration validation and the injectable clock/date window.
-- Add Google OAuth/calendar adapter with pagination and recurrence expansion.
-- Add normalisation, privacy filtering, day overlap grouping, sorting, caching, and `/api/today`.
-- Keep `weather: null` and `meal: null` until their integrations are active.
-- Swap the frontend data source from fixture to same-origin API without changing render components.
-
-### Step 4: weather
-
-- Add Open-Meteo adapter and weather cache.
-- Add pure outfit rule and populate weather for all seven days.
-- Render detailed weather/outfit on today only. Future-day weather remains available in data but hidden pending the open visual-noise decision.
-
-### Step 5: unattended resilience
-
-- Add client polling, timeout, local last-known-good validation, stale state, and cold-start unavailable state.
-- Add backend last-known-good fallback and `X-Data-Stale`.
-- Add one daily controlled reload and midnight rollover tests.
-- Add shallow health check, production build/static serving, deployment notes, log redaction, and graceful restart procedure.
-
-### Step 6: wall verification and release
-
-- Test the production build through the actual Pi/TV kiosk URL.
-- Observe viewing distance, overscan, clipping, wake/reboot behaviour, stale behaviour, and midnight rollover.
-- Only after the calendar has remained reliable should a separate Phase 6 plan verify Sous date storage and define the meal read path.
-
-## 13. Test plan
-
-### Shared contract tests
-
-- Canonical fixture passes.
-- Invalid group/outfit values fail.
-- Six or eight `days` fail.
-- Missing arrays and missing `meal` fail.
-- Missing timestamp offset, impossible dates, reversed event times, and out-of-range weather fail.
-- Non-consecutive dates or `isToday` outside index 0 fail.
-
-### Backend unit tests
-
-- Rolling window across ordinary midnight.
-- Europe/London transitions into and out of British Summer Time.
-- Week/month/year boundaries and leap day.
-- Strict outfit boundaries: rain at 51; temperature at 8, 14, 20, and just above 20.
-- All-day-first and deterministic timed-event ordering.
-- Cancelled and self-declined filtering.
-- Missing title/location normalisation.
-- Calendar ID-to-group mapping and startup rejection of incomplete/duplicate config.
-- Recurring and multi-day event grouping.
-- Weather-null behaviour on missing forecast days.
-- Cache TTL, concurrent request coalescing, stale fallback, and no-cache-with-no-snapshot error.
-
-### Backend route/integration tests
-
-- `GET /api/today` returns schema-valid JSON, exactly seven days, and the correct freshness header.
-- Provider adapters are mocked; tests make no live Google/Open-Meteo calls.
-- `503` response is redacted when no payload exists.
-- Unknown route returns a safe response.
-- Non-GET methods do not mutate anything and return `404` or `405` consistently.
-- `/healthz` is provider-independent and redacted.
-- Static frontend and API work from one origin in a production build.
-
-### Frontend tests
-
-- Initial loading to success.
-- Yesterday/today/future hierarchy and exact day count.
-- Empty day copy.
-- All six group markers and non-colour labels.
-- All-day versus timed event rendering.
-- Today weather/outfit rendering and `weather: null` omission.
-- Poll success atomically replaces data.
-- Poll/network/schema failure keeps the prior render and marks it stale.
-- Cold start uses a valid cached payload.
-- Invalid cached payload is discarded and unavailable state is shown.
-- `X-Data-Stale: true` marks an otherwise successful response stale.
-- Daily reload schedules once and cannot loop.
-- No interactive navigation or accidental calendar write controls exist.
-
-### Manual TV checks
-
-- Readable in a five-second glance from 6–10 feet.
-- No cropped content with expected TV overscan.
-- No scrollbars at target resolution.
-- Cursor is hidden and no Chromium prompts obscure the page.
-- Dark initial paint; no white flash.
-- Long titles, simultaneous events, busy days, and empty days do not overlap.
-- Reboot returns automatically to the display.
-- Network interruption retains data and recovery clears the stale marker.
-
-## 14. Acceptance criteria
-
-### Contract and privacy
-
-- One shared runtime schema validates the fixture, server output, and frontend input.
-- The payload always contains separate `yesterday` and exactly seven ordered `days` beginning with server-defined today.
-- The browser receives only the six fixed group values, never raw Google colour IDs, calendar IDs, emails, OAuth material, coordinates, attendee data, or descriptions.
-- All timestamps include offsets and all day/date decisions use Europe/London server-side.
-- Every current day includes `weather` and `meal`; either may be `null`, and `meal` is always `null` in this release.
-
-### Calendar behaviour
-
-- The Family and BAES calendars are read with `calendar.readonly`, recurring instances are expanded, and event colour IDs are resolved through the fixed group mapping with source-default fallback.
-- Cancelled and self-declined events do not render.
-- Events are assigned to every overlapping display date and sorted all-day first, then chronologically with deterministic ties.
-- Empty days render normally rather than failing or disappearing.
-- Same-day calendar changes appear after the provider/server cache and next five-minute client poll, without manual reload.
-
-### Weather behaviour
-
-- Open-Meteo is called server-side with configured coordinates and Europe/London timezone.
-- Weather is available in the contract for all forecasted display days.
-- The server applies the exact precipitation-first outfit thresholds in this plan.
-- The initial UI renders weather/outfit on today only; missing weather does not hide calendar data.
-
-### Kiosk UX
-
-- The main display presents yesterday quietly, today dominantly, and six future days at normal weight.
-- The target TV view has no page scrolling, browser controls, pointer, clipped cards, or text below the agreed legibility baseline.
-- Group identity is distinguishable without relying solely on colour.
-- Loading, empty, stale, and unavailable states are implemented and tested.
-- There are no forms, navigation, editing controls, or touchscreen dependencies.
-
-### Resilience and operations
-
-- Five-minute polling never blanks a previously valid display.
-- A valid browser snapshot survives a reload while offline and is visibly marked stale.
-- The server serves its last complete valid payload as stale when providers fail; with no snapshot it returns a redacted `503`.
-- The page performs one controlled full reload daily in the small hours and correctly rolls over at midnight.
-- Production serves frontend and API from one origin over the approved private/authenticated route.
-- Secrets are server-only, ignored by Git, absent from logs/responses, and represented only by safe names in `.env.example`.
-- `npm` install, lint, typecheck, unit/integration tests, and production build all pass in CI and on the deployment host.
-- The final application is exercised on the actual Raspberry Pi/TV, not accepted from laptop screenshots alone.
-
-## 15. Open decisions and conservative defaults
-
-- Final product name: keep “Family Display” until renamed; naming must not block implementation.
-- Future-day weather visuals: data is populated, UI hides it initially to minimise visual noise.
-- Outfit tuning: use the exact edge rules above for release one, then alter configuration only after a week of observation.
-- Sous integration: do not start until Sous is confirmed to track the real date and expose meals by explicit date.
-- Deployment gate: prefer private Tailscale access. If operations chooses public internet reachability, authenticated reverse-proxy design and credential provisioning require an explicit security decision before release.
-
-These open decisions do not alter the shared Phase 1–5 API body and therefore do not need to block the frontend or backend implementation tasks.
+Do not infer deployment from a passing branch build. The deployed baseline remains `7d1e066` until operations explicitly releases and verifies a later commit.
