@@ -68,7 +68,7 @@ function Events({ events, timezone, compact = false }: { events: EventOccurrence
         const displayedTime = eventTime(event, timezone);
         const accessibleLabel = `${groupLabels[event.group].accessible}: ${event.title}, ${displayedTime}${event.location ? `, at ${event.location}` : ""}`;
         return (
-          <li className={`event event--${event.group}`} key={event.id} aria-label={accessibleLabel}>
+          <li className={`event event--${event.group}${event.allDay ? " event--all-day" : ""}`} key={event.id} aria-label={accessibleLabel}>
             {event.allDay
               ? <span className="event__time event__time--all-day" aria-hidden="true">—</span>
               : <time className="event__time" dateTime={event.start}>{displayedTime}</time>}

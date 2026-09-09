@@ -18,26 +18,35 @@ colors:
 typography:
   display:
     fontFamily: Inter
-    fontSize: 9vw
+    fontSize: "clamp(5rem, 8vw, 9rem)"
     fontWeight: 300
     lineHeight: 0.9
     letterSpacing: "-0.05em"
   title:
     fontFamily: Inter
-    fontSize: 2.35vw
+    fontSize: "clamp(1.625rem, 2.05vw, 2.35rem)"
     fontWeight: 650
     lineHeight: 1.15
   body:
     fontFamily: Inter
-    fontSize: 1.675vw
+    fontSize: "clamp(1.3125rem, 1.465vw, 1.625rem)"
+    fontWeight: 400
+    lineHeight: 1.3
+  small:
+    fontFamily: Inter
+    fontSize: "clamp(1.1rem, 1.2vw, 1.375rem)"
     fontWeight: 400
     lineHeight: 1.3
   label:
     fontFamily: Inter
-    fontSize: 1.2vw
+    fontSize: "clamp(1rem, 1.05vw, 1.2rem)"
     fontWeight: 700
     lineHeight: 1.2
     letterSpacing: "0.06em"
+icons:
+  sm: 24px
+  md: 32px
+  lg: 72px
 rounded:
   sm: 8px
   md: 12px
@@ -93,32 +102,40 @@ components:
 
 ## Overview
 
-A dark, stable television dashboard designed for a five-second glance across a room. Each date owns its weather, outfit, events and dinner; today is dominant, future days are consistent, and yesterday is quiet context. An optional morning quote sits within today’s primary panel so it reads as calm context rather than a separate feature.
+Family Display is a dark, stable television dashboard designed for a five-second glance. The main desktop composition is a dominant Today card, a top-right rail containing the permanent calendar key above Previous day, and six equal upcoming-day cards across the lower row. Previous day is events-only. Today and the six upcoming dates own their weather, outfit, events and optional dinner. An optional morning quote sits inside Today rather than becoming another panel.
+
+Commit `7d1e066` is the deployed pre-change baseline. This design records the hierarchy and compact-event corrections in this unreleased branch/candidate; the document itself is not evidence that those changes are deployed.
 
 ## Colors
 
-The six event colours preserve the established Google Calendar mapping while using tuned chroma and luminance for television viewing. Every foreground/background pair reaches at least 7:1 contrast: filled pills use deep ink text except Graphite, which uses light text. Time, location and title text remain fully opaque; the inverse group badge gives the identity label a distinct colour hierarchy without relying on hue alone. Cyan is reserved for weather and date emphasis rather than household identity.
+The six event colours preserve the Google Calendar mapping while using tuned chroma and luminance for television viewing. Every foreground/background pair reaches at least 7:1 contrast. Filled pills use deep ink except Graphite, which uses light text. Time, location and title remain opaque, and an inverse text badge identifies the group without relying on hue alone. Cyan is reserved for weather and date emphasis.
 
-## Typography
+## Typography and icon hierarchy
 
-Use weight, size and restrained uppercase labels to establish hierarchy. The shared label, small, body, title and display steps are approximately 50% larger than the previous television release and aligned to a clean modular scale. Never reduce primary TV text merely to fit more content; truncate exceptional content predictably instead.
+Use the exact five responsive type tokens in the frontmatter. They reduce the enlarged baseline by roughly 10–15% while preserving a distance-readable scale. Exceptional strings truncate predictably rather than forcing the general scale down.
+
+Today weather is intentionally stronger than future weather: the Today weather copy uses body size, temperature uses `clamp(2.25rem, 3.2vw, 3.5rem)`, and its weather icon uses the 72px large token. Compact cards use label-sized weather/outfit copy, body-sized temperature, a 32px weather icon and a 24px outfit icon. Today outfit guidance uses body text at weight 700 with a 32px icon.
 
 ## Layout
 
-All spacing is drawn from a four-point scale. The 1366×768 and television layouts must fit without scrolling. The permanent calendar key lives in the top-right rail above the previous-day panel; narrow development views keep it in normal document flow and may stack and scroll normally.
+All spacing comes from the four-point scale. Above 900px, the board is locked to the viewport and uses `minmax(0, 1.3fr) minmax(0, 0.9fr)`, giving the six-card lower row more room than the deployed baseline. The permanent calendar key occupies the top-right rail above Previous day. At 900px and below, sections enter document flow, stack progressively and may scroll for development access.
 
-## Shapes
-
-Panels use 20px radii, event pills use 12px radii, and compact controls or badges use 8px radii. Local icons use a 28px, 42px and 56px scale, 75% larger than the first television release.
+The intended desktop acceptance viewport is 1366×768. In candidate-browser verification with a crowded local fixture, board and scroll dimensions were exactly 1366×768, desktop rows were 416px and 288px, and all six future cards were fully inside the viewport with zero scroll excess. The compact all-day dash/body/group computed to grid row 1, and a long title remained visible and ellipsized. Computed Today/compact hierarchy values were weather text 21/16px, icon 72/32px, temperature 43.712/21px and outfit 21/16px. Screenshot capture timed out, so screenshot-based aesthetic assessment remains unverified; physical Pi/TV acceptance remains a separate outstanding gate.
 
 ## Components
 
-The today panel combines date, forecast, outfit, schedule, dinner and the optional morning quote. The quote uses a restrained inset treatment beside dinner and remains absent when its private provider is not configured or unavailable. Every future-day column contains the same date-specific data categories in compressed form. Event pills are filled with their household-group colour, retain a visible group badge plus an accessible label that includes the displayed time, and replace overflow with a deterministic `+N more` summary rather than clipping events silently. All-day events show a visually separate em dash while their accessible event label continues to say “All day”.
+- **Today:** full date, prominent Open-Meteo condition and temperature, prominent outfit guidance, up to three events, optional Sous dinner and optional morning quote.
+- **Top-right rail:** permanent six-group Calendar key, freshness state and quiet Previous day content.
+- **Upcoming days:** six compact cards with date, weather/outfit, dinner and one event.
+- **Event overflow:** Today renders three events and compact contexts render one; additional events become deterministic `+N more` rows.
+- **All-day event:** a visible em dash is `aria-hidden`; the event row’s accessible label says “All day”. A compact all-day event is one grid row (`auto minmax(0, 1fr) auto`) so its bounded, ellipsized title cannot drop below a still-visible dash. Timed compact events retain the two-row treatment.
 
 ## Do's and Don'ts
 
-- Do preserve the household colour mapping and WCAG AA text contrast.
+- Do preserve the Family/BAES source defaults and six colour mappings.
 - Do keep weather, outfit and meal icons local and dependency-free.
 - Do keep all information stable; there are no carousels or hover-only details.
+- Do preserve stale data and show its timestamp rather than blanking the board.
 - Don't infer dates, outfits or household groups in the browser.
-- Don't split dinner into a disconnected half-screen feature.
+- Don't expose private providers or port 3000 outside the approved Tailscale boundary.
+- Don't treat candidate-browser geometry as physical-display acceptance; Raspberry Pi/TV overscan, clipping, cursor behaviour, viewing-distance readability, wake/reboot recovery, stale operation and midnight rollover remain outstanding.

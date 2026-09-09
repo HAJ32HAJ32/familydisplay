@@ -31,21 +31,39 @@ function contrast(foreground: string, background: string) {
 }
 
 describe("visual system", () => {
-  it("raises the complete TV type scale by roughly fifty percent on a clean modular scale", () => {
-    expect(styles).toContain("--text-label: clamp(1.125rem, 1.2vw, 1.375rem)");
-    expect(styles).toContain("--text-small: clamp(1.25rem, 1.375vw, 1.5625rem)");
-    expect(styles).toContain("--text-body: clamp(1.5rem, 1.675vw, 1.875rem)");
-    expect(styles).toContain("--text-title: clamp(1.875rem, 2.35vw, 2.6875rem)");
-    expect(styles).toContain("--text-display: clamp(5.5rem, 9vw, 10rem)");
+  it("allocates more desktop height to the six future cards", () => {
+    expect(styles).toMatch(/\.display-board\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1\.3fr\)\s+minmax\(0,\s*0\.9fr\);/s);
   });
 
-  it("raises standalone weather text and all local icons with the same visual scale", () => {
-    expect(styles).toContain("font-size: clamp(2.125rem, 3vw, 3.375rem)");
-    expect(styles).toContain("--icon-sm: 1.75rem");
-    expect(styles).toContain("--icon-md: 2.625rem");
-    expect(styles).toContain("--icon-lg: 3.5rem");
-    expect(styles).toMatch(/\.icon\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
+  it("uses the revised TV type scale", () => {
+    expect(styles).toContain("--text-label: clamp(1rem, 1.05vw, 1.2rem)");
+    expect(styles).toContain("--text-small: clamp(1.1rem, 1.2vw, 1.375rem)");
+    expect(styles).toContain("--text-body: clamp(1.3125rem, 1.465vw, 1.625rem)");
+    expect(styles).toContain("--text-title: clamp(1.625rem, 2.05vw, 2.35rem)");
+    expect(styles).toContain("--text-display: clamp(5rem, 8vw, 9rem)");
+  });
+
+  it("makes today's weather and outfit materially larger than compact forecasts", () => {
+    expect(styles).toContain("--icon-sm: 1.5rem");
+    expect(styles).toContain("--icon-md: 2rem");
+    expect(styles).toContain("--icon-lg: 4.5rem");
+    expect(styles).toMatch(/\.weather\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
+    expect(styles).toMatch(/\.weather--compact\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
+    expect(styles).toMatch(/\.weather__reading strong\s*\{[^}]*font-size:\s*clamp\(2\.25rem,\s*3\.2vw,\s*3\.5rem\);/s);
+    expect(styles).toMatch(/\.weather--compact \.weather__reading strong\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
     expect(styles).toMatch(/\.icon--weather\s*\{[^}]*width:\s*var\(--icon-lg\);[^}]*height:\s*var\(--icon-lg\);/s);
+    expect(styles).toMatch(/\.weather--compact \.icon--weather\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
+    expect(styles).toMatch(/\.outfit \.icon--outfit\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
+    expect(styles).toMatch(/\.outfit span\s*\{[^}]*font-size:\s*var\(--text-body\);[^}]*font-weight:\s*700;/s);
+    expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
+  });
+
+  it("keeps compact all-day events on one bounded row without changing timed compact rows", () => {
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day\s*\{[^}]*grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+auto;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__time\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__body\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*1;[^}]*overflow:\s*hidden;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__group\s*\{[^}]*grid-column:\s*3;[^}]*grid-row:\s*1;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event__body\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*grid-row:\s*2;/s);
   });
 
   it.each([
