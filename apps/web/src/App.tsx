@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Meal, MorningQuote } from "@family-display/contract";
 import type { DisplayDay, DisplayPayload, EventOccurrence } from "./data/schema";
 import { scheduleDailyReload } from "./data/dailyReload";
@@ -56,14 +56,68 @@ function eventTime(event: EventOccurrence, timezone: string) {
     .format(new Date(event.start));
 }
 
-function Events({ events, timezone, compact = false }: { events: EventOccurrence[]; timezone: string; compact?: boolean }) {
+function Events({ events, timezone, compact = false, adaptive = false }: { events: EventOccurrence[]; timezone: string; compact?: boolean; adaptive?: boolean }) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const eventsSignature = JSON.stringify(events);
+  const [measurement, setMeasurement] = useState<{ signature: string; count: number | null }>({ signature: eventsSignature, count: null });
+  const measuredCount = measurement.signature === eventsSignature ? measurement.count : null;
+
+  useLayoutEffect(() => {
+    if (!adaptive || measuredCount !== null || events.length === 0 || !listRef.current) return;
+    const list = listRef.current;
+    const viewportHeight = Math.max(0, window.innerHeight - list.getBoundingClientRect().top);
+    const availableHeight = Math.min(list.clientHeight, viewportHeight);
+    if (availableHeight <= 0) {
+      setMeasurement({ signature: eventsSignature, count: events.length });
+      return;
+    }
+
+    const eventHeights = Array.from(list.children)
+      .filter((child) => child.classList.contains("event"))
+      .map((event) => Math.max(event.scrollHeight, event.getBoundingClientRect().height));
+    const gap = Number.parseFloat(getComputedStyle(list).rowGap) || 8;
+    const eventsHeight = eventHeights.reduce((total, height) => total + height, 0) + gap * Math.max(0, eventHeights.length - 1);
+    if (eventsHeight <= availableHeight) {
+      setMeasurement({ signature: eventsSignature, count: events.length });
+      return;
+    }
+
+    const overflowProbe = document.createElement("li");
+    overflowProbe.className = "event-overflow event-overflow--measure";
+    overflowProbe.textContent = `+${events.length} more`;
+    list.append(overflowProbe);
+    const overflowHeight = overflowProbe.getBoundingClientRect().height || 32;
+    overflowProbe.remove();
+
+    let count = 0;
+    let usedHeight = overflowHeight;
+    for (const height of eventHeights) {
+      const nextHeight = usedHeight + gap + height;
+      if (nextHeight > availableHeight) break;
+      usedHeight = nextHeight;
+      count += 1;
+    }
+    setMeasurement({ signature: eventsSignature, count });
+  }, [adaptive, events.length, eventsSignature, measuredCount]);
+
+  useEffect(() => {
+    if (!adaptive || !listRef.current) return;
+    const requestMeasurement = () => setMeasurement({ signature: eventsSignature, count: null });
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(requestMeasurement);
+    observer?.observe(listRef.current);
+    window.addEventListener("resize", requestMeasurement);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", requestMeasurement);
+    };
+  }, [adaptive, eventsSignature]);
+
   if (events.length === 0) return <p className="empty-day">Nothing planned</p>;
-  const visibleLimit = compact ? 1 : 3;
-  const visibleCount = Math.min(events.length, visibleLimit);
+  const visibleCount = adaptive ? measuredCount ?? events.length : Math.min(events.length, compact ? 1 : 3);
   const visibleEvents = events.slice(0, visibleCount);
   const hiddenCount = events.length - visibleCount;
   return (
-    <ul className={`event-list${compact ? " event-list--compact" : ""}`}>
+    <ul ref={listRef} data-visible-events={visibleCount} className={`event-list${compact ? " event-list--compact" : ""}${adaptive ? " event-list--adaptive" : ""}`}>
       {visibleEvents.map((event) => {
         const displayedTime = eventTime(event, timezone);
         const accessibleLabel = `${groupLabels[event.group].accessible}: ${event.title}, ${displayedTime}${event.location ? `, at ${event.location}` : ""}`;
@@ -134,8 +188,8 @@ function MealSummary({ meal, today = false }: { meal: Meal | null; today?: boole
 function MorningQuoteSummary({ quote }: { quote: MorningQuote }) {
   return (
     <blockquote className="morning-quote" aria-label="Morning quote">
-      <p>“{quote.text}”</p>
-      <cite>— {quote.attribution}</cite>
+      <p aria-label={`Quote: ${quote.text}`} title={quote.text}>“{quote.text}”</p>
+      <cite aria-label={`Attribution: ${quote.attribution}`} title={quote.attribution}>— {quote.attribution}</cite>
     </blockquote>
   );
 }
@@ -167,14 +221,14 @@ function FutureDay({ day, timezone }: { day: DisplayDay; timezone: string }) {
   return (
     <section className="future-day" data-testid="future-day">
       <div className="future-day__summary">
-        <h2>
+        <h2 className="future-day__date">
           <span>{day.weekday}</span>
           <strong>{datePart(day.date, timezone, "day")}</strong>
         </h2>
         <Weather day={day} compact />
         <MealSummary meal={day.meal} />
       </div>
-      <Events events={day.events} timezone={timezone} compact />
+      <Events events={day.events} timezone={timezone} compact adaptive />
     </section>
   );
 }
@@ -216,7 +270,7 @@ function YesterdayPanel({ payload }: { payload: DisplayPayload }) {
     <aside className="yesterday-panel">
       <p className="eyebrow">Previous day</p>
       <h2>Yesterday · {payload.yesterday.weekday} {longDate(payload.yesterday.date, payload.timezone)}</h2>
-      <Events events={payload.yesterday.events} timezone={payload.timezone} compact />
+      <Events events={payload.yesterday.events} timezone={payload.timezone} compact adaptive />
     </aside>
   );
 }

@@ -1,4 +1,4 @@
-import { act, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { scheduleDailyReload } from "./data/dailyReload";
@@ -35,6 +35,19 @@ describe("Family Display", () => {
     expect(screen.getByRole("heading", { name: "Yesterday · Wed 26 August" })).toBeVisible();
     expect(screen.getAllByTestId("future-day")).toHaveLength(6);
     expect(screen.getByText("Updated 18:42")).toBeVisible();
+  });
+
+  it("stacks each future weekday above its date beside compact weather with the meal below", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    const future = (await screen.findAllByTestId("future-day"))[0]!;
+    const summary = future.querySelector(".future-day__summary")!;
+    const date = summary.querySelector(".future-day__date");
+    expect(date).not.toBeNull();
+    expect(date).toHaveTextContent("Fri28");
+    expect(date?.nextElementSibling).toHaveClass("weather--compact");
+    expect(summary.lastElementChild).toHaveClass("meal");
   });
 
   it("renders a valid browser snapshot as stale on an offline cold start", async () => {
@@ -239,7 +252,7 @@ describe("Family Display", () => {
     expect(textGroup).toHaveTextContent("Tonight’s mealDinner not set");
   });
 
-  it("renders a deterministic overflow summary instead of silently clipping valid events", async () => {
+  it("retains today's deterministic cap while future cards defer to measured capacity", async () => {
     const crowded = {
       ...payload,
       days: payload.days.map((day, dayIndex) => {
@@ -266,11 +279,11 @@ describe("Family Display", () => {
     expect(screen.getByText("Today event 3")).toBeVisible();
     expect(screen.queryByText("Today event 4")).not.toBeInTheDocument();
     expect(screen.getByText("Future event 1")).toBeVisible();
-    expect(screen.queryByText("Future event 2")).not.toBeInTheDocument();
-    expect(screen.getAllByText("+3 more")).toHaveLength(2);
+    expect(screen.getByText("Future event 4")).toBeVisible();
+    expect(screen.getByText("+3 more")).toBeVisible();
   });
 
-  it("uses one compact event plus an overflow summary when a future day has exactly two events", async () => {
+  it("renders every future event when the card has capacity", async () => {
     const twoEvents = {
       ...payload,
       days: payload.days.map((day, dayIndex) => dayIndex === 2
@@ -288,8 +301,85 @@ describe("Family Display", () => {
     render(<App />);
 
     expect(await screen.findByText("First compact event")).toBeVisible();
-    expect(screen.queryByText("Second compact event")).not.toBeInTheDocument();
-    expect(screen.getByText("+1 more")).toBeVisible();
+    expect(screen.getByText("Second compact event")).toBeVisible();
+    expect(screen.queryByText("+1 more")).not.toBeInTheDocument();
+  });
+
+  it("bounds crowded Yesterday events to measured capacity with a +N summary", async () => {
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) {
+      return this.closest(".yesterday-panel") && this.classList.contains("event-list--adaptive") ? 128 : 0;
+    });
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("event") ? 40 : 0;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const height = this.classList.contains("event-overflow") ? 32 : this.classList.contains("event") ? 40 : 0;
+      return { x: 0, y: 0, width: 100, height, top: 0, right: 100, bottom: height, left: 0, toJSON: () => ({}) };
+    });
+    const crowdedYesterday = {
+      ...payload,
+      yesterday: {
+        ...payload.yesterday,
+        events: Array.from({ length: 4 }, (_, index) => ({
+          ...payload.yesterday.events[0]!,
+          id: `evt_yesterday_${index}`,
+          title: `Yesterday event ${index + 1}`,
+        })),
+      },
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(crowdedYesterday));
+
+    render(<App />);
+
+    expect(await screen.findByText("Yesterday event 1")).toBeVisible();
+    const yesterdayList = screen.getByText("Yesterday event 1").closest("ul")!;
+    await waitFor(() => expect(yesterdayList).toHaveAttribute("data-visible-events", "2"));
+    expect(screen.getByText("Yesterday event 2")).toBeVisible();
+    expect(screen.queryByText("Yesterday event 3")).not.toBeInTheDocument();
+    expect(within(yesterdayList).getByText("+2 more")).toBeVisible();
+  });
+
+  it("shows +N more only when measured future-card height is exceeded and recalculates on resize", async () => {
+    let availableHeight = 128;
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("event-list--adaptive") ? availableHeight : 0;
+    });
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("event") ? 40 : 0;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const height = this.classList.contains("event-overflow") ? 32 : this.classList.contains("event") ? 40 : 0;
+      return { x: 0, y: 0, width: 100, height, top: 0, right: 100, bottom: height, left: 0, toJSON: () => ({}) };
+    });
+    const crowdedFuture = {
+      ...payload,
+      days: payload.days.map((day, dayIndex) => dayIndex === 1
+        ? {
+            ...day,
+            events: Array.from({ length: 4 }, (_, index) => ({
+              ...payload.days[0]!.events[1]!,
+              id: `evt_measured_${index}`,
+              title: `Measured event ${index + 1}`,
+            })),
+          }
+        : day),
+    };
+    vi.mocked(fetch).mockResolvedValueOnce(response(crowdedFuture));
+
+    render(<App />);
+
+    expect(await screen.findByText("Measured event 1")).toBeVisible();
+    const measuredList = screen.getByText("Measured event 1").closest("ul")!;
+    await waitFor(() => expect(measuredList).toHaveAttribute("data-visible-events", "2"));
+    expect(screen.getByText("Measured event 2")).toBeVisible();
+    expect(screen.queryByText("Measured event 3")).not.toBeInTheDocument();
+    expect(screen.getByText("+2 more")).toBeVisible();
+
+    availableHeight = 300;
+    fireEvent(window, new Event("resize"));
+    await waitFor(() => expect(measuredList).toHaveAttribute("data-visible-events", "4"));
+    expect(screen.getByText("Measured event 4")).toBeVisible();
+    expect(screen.queryByText("+2 more")).not.toBeInTheDocument();
   });
 
   it("keeps a long compact all-day event title in the same bounded row as its dash", async () => {
@@ -330,8 +420,25 @@ describe("Family Display", () => {
     render(<App />);
 
     const quote = await screen.findByRole("blockquote", { name: "Morning quote" });
+    expect(quote.previousElementSibling).toHaveClass("meal--today");
     expect(quote).toHaveTextContent("Do the work in front of you.");
     expect(quote).toHaveTextContent("Marcus Aurelius");
+  });
+
+  it("keeps maximum valid morning quote content available when its visible text is truncated", async () => {
+    const text = "Q".repeat(500);
+    const attribution = "A".repeat(120);
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...payload, morningQuote: { text, attribution } }));
+
+    render(<App />);
+
+    const quote = await screen.findByRole("blockquote", { name: "Morning quote" });
+    const quoteText = quote.querySelector("p");
+    const quoteAttribution = quote.querySelector("cite");
+    expect(quoteText).toHaveAttribute("aria-label", `Quote: ${text}`);
+    expect(quoteText).toHaveAttribute("title", text);
+    expect(quoteAttribution).toHaveAttribute("aria-label", `Attribution: ${attribution}`);
+    expect(quoteAttribution).toHaveAttribute("title", attribution);
   });
 
   it("renders local weather, outfit and meal icons from the shared icon library", async () => {
