@@ -9,11 +9,11 @@ const REQUEST_TIMEOUT_MS = 10 * 1000;
 export type ReadyState = { status: "ready"; payload: DisplayPayload; receivedAt: Date; stale: boolean };
 export type DisplayDataState = { status: "loading" } | { status: "unavailable" } | ReadyState;
 
-function migrateLegacyPayload(payload: unknown): unknown {
+function migrateCachedPayload(payload: unknown, isV1 = false): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
-  const legacy = payload as Record<string, unknown>;
-  const days = Array.isArray(legacy.days)
-    ? legacy.days.map((day) => {
+  const cached = payload as Record<string, unknown>;
+  const days = isV1 && Array.isArray(cached.days)
+    ? cached.days.map((day) => {
       if (!day || typeof day !== "object" || Array.isArray(day)) return day;
       const legacyDay = day as Record<string, unknown>;
       const weather = legacyDay.weather;
@@ -21,13 +21,14 @@ function migrateLegacyPayload(payload: unknown): unknown {
         ? { ...legacyDay, weather: null }
         : legacyDay;
     })
-    : legacy.days;
-  return { ...legacy, days, morningQuote: null };
+    : cached.days;
+  const migrated = { ...cached, days, ...(isV1 ? { morningQuote: null } : {}) };
+  return "nextMatch" in migrated ? migrated : { ...migrated, nextMatch: null };
 }
 
 function parseSnapshot(raw: string, legacy = false): ReadyState {
   const input = JSON.parse(raw) as { payload?: unknown; receivedAt?: unknown };
-  const candidate = legacy ? migrateLegacyPayload(input.payload) : input.payload;
+  const candidate = migrateCachedPayload(input.payload, legacy);
   const payload = displayPayloadSchema.parse(candidate);
   const receivedAt = typeof input.receivedAt === "string" && Number.isFinite(Date.parse(input.receivedAt))
     ? new Date(input.receivedAt)

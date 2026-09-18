@@ -47,6 +47,18 @@ export const morningQuoteSchema = z.strictObject({
   text: z.string().trim().min(1).max(500),
   attribution: z.string().trim().min(1).max(120)
 });
+const footballTeamSchema = z.strictObject({
+  id: z.string().regex(/^\d+$/).max(20),
+  name: z.string().trim().min(1).max(100),
+  crestUrl: z.string().regex(/^\/api\/football\/crest\/\d+$/)
+});
+export const footballMatchSchema = z.strictObject({
+  id: z.string().trim().min(1).max(100),
+  competition: z.string().trim().min(1).max(120),
+  kickoff: timestampSchema,
+  homeTeam: footballTeamSchema,
+  awayTeam: footballTeamSchema
+});
 export const displayDaySchema = z.strictObject({
   date: localDateSchema,
   weekday: weekdaySchema,
@@ -61,6 +73,7 @@ export const displayPayloadSchema = z.strictObject({
   generatedAt: timestampSchema,
   timezone: z.literal("Europe/London"),
   morningQuote: morningQuoteSchema.nullable(),
+  nextMatch: footballMatchSchema.nullable(),
   yesterday: z.strictObject({ date: localDateSchema, weekday: weekdaySchema, events: z.array(eventOccurrenceSchema) }),
   days: sevenDaysSchema
 }).superRefine((payload, context) => {
@@ -82,5 +95,6 @@ export type EventOccurrence = z.infer<typeof eventOccurrenceSchema>;
 export type WeatherSummary = z.infer<typeof weatherSummarySchema>;
 export type Meal = z.infer<typeof mealSchema>;
 export type MorningQuote = z.infer<typeof morningQuoteSchema>;
+export type FootballMatch = z.infer<typeof footballMatchSchema>;
 export type DisplayDay = z.infer<typeof displayDaySchema>;
 export type DisplayPayload = z.infer<typeof displayPayloadSchema>;

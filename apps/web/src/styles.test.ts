@@ -85,9 +85,26 @@ describe("visual system", () => {
     expect(styles).toContain("--text-display: clamp(5rem, 8vw, 9rem)");
   });
 
-  it("lets today's meal consume the aside's free height while the bounded quote remains below", () => {
-    expect(styles).toMatch(/\.meal--today\s*\{[^}]*align-self:\s*stretch;[^}]*flex:\s*1\s+1\s+0;[^}]*min-height:\s*0;/s);
+  it("lets today's meal fill the aside width while hugging its content height", () => {
+    expect(styles).toMatch(/\.meal--today\s*\{[^}]*align-self:\s*stretch;[^}]*flex:\s*0\s+0\s+auto;/s);
     expect(styles).toMatch(/\.morning-quote\s*\{[^}]*flex:\s*0\s+0\s+auto;[^}]*overflow:\s*visible;/s);
+  });
+
+  it("keeps the West Ham fixture full-width, content-height and compact beside the meal and quote", () => {
+    expect(styles).toMatch(/\.next-match\s*\{[^}]*align-self:\s*stretch;[^}]*flex:\s*0\s+0\s+auto;[^}]*padding:\s*var\(--space-3\);/s);
+    expect(styles).toMatch(/\.next-match__fixture\s*\{[^}]*grid-template-columns:\s*minmax\(2\.5rem,\s*1fr\)\s+minmax\(6rem,\s*auto\)\s+minmax\(2\.5rem,\s*1fr\);/s);
+    expect(styles).toMatch(/\.next-match__team img\s*\{[^}]*width:\s*2\.5rem;[^}]*height:\s*2\.5rem;[^}]*object-fit:\s*contain;/s);
+  });
+
+  it("compacts the quote only when the match card is present so the Today aside stays bounded", () => {
+    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\)\s*\{[^}]*gap:\s*var\(--space-2\);/s);
+    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote\s*\{[^}]*flex:\s*1\s+1\s+0;[^}]*padding:\s*var\(--space-3\);[^}]*overflow:\s*hidden;/s);
+    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote p\s*\{[^}]*font-size:\s*var\(--text-small\);[^}]*line-height:\s*1\.25;[^}]*-webkit-line-clamp:\s*2;/s);
+    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote cite\s*\{[^}]*font-size:\s*clamp\(0\.8rem,\s*0\.9vw,\s*1rem\);[^}]*-webkit-line-clamp:\s*1;/s);
+  });
+
+  it("keeps today's temperature inside the narrowed date column at TV size", () => {
+    expect(styles).toMatch(/\.weather__reading strong\s*\{[^}]*font-size:\s*clamp\(2\.25rem,\s*2\.7vw,\s*3rem\);/s);
   });
 
   it("intentionally truncates long morning quote content to deterministic readable lines", () => {
@@ -95,9 +112,16 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.morning-quote cite\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s);
   });
 
-  it("keeps today's outfit in and centred across the weather reading column while compact outfits stay content-sized", () => {
-    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*2;[^}]*justify-content:\s*center;[^}]*width:\s*100%;/s);
+  it("left-aligns today's date and weather content while the outfit spans the full weather width", () => {
+    expect(styles).toMatch(/\.today-card__date\s*\{[^}]*align-items:\s*stretch;[^}]*text-align:\s*left;/s);
+    expect(styles).toMatch(/\.weather\s*\{[^}]*width:\s*100%;[^}]*text-align:\s*left;/s);
+    expect(styles).not.toMatch(/\.weather\s*\{[^}]*justify-items:\s*start;/s);
+    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*width:\s*100%;/s);
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*flex-start;[^}]*width:\s*fit-content;/s);
+  });
+
+  it("centres today's outfit content inside its full-width pill", () => {
+    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*center;[^}]*width:\s*100%;/s);
   });
 
   it("makes today's weather and outfit materially larger than compact forecasts", () => {
@@ -106,7 +130,7 @@ describe("visual system", () => {
     expect(styles).toContain("--icon-lg: 4.5rem");
     expect(styles).toMatch(/\.weather\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
     expect(styles).toMatch(/\.weather--compact\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
-    expect(styles).toMatch(/\.weather__reading strong\s*\{[^}]*font-size:\s*clamp\(2\.25rem,\s*3\.2vw,\s*3\.5rem\);/s);
+    expect(styles).toMatch(/\.weather__reading strong\s*\{[^}]*font-size:\s*clamp\(2\.25rem,\s*2\.7vw,\s*3rem\);/s);
     expect(styles).toMatch(/\.weather--compact \.weather__reading strong\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
     expect(styles).toMatch(/\.icon--weather\s*\{[^}]*width:\s*var\(--icon-lg\);[^}]*height:\s*var\(--icon-lg\);/s);
     expect(styles).toMatch(/\.weather--compact \.icon--weather\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
@@ -141,6 +165,10 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.event__time\s*\{[^}]*color:\s*var\(--event-time-ink\);[^}]*font-weight:\s*400;/s);
     expect(styles).toMatch(/\.event__location\s*\{[^}]*color:\s*var\(--event-meta-ink\);[^}]*font-weight:\s*400;/s);
     expect(styles).toMatch(/\.event__group\s*\{[^}]*border:\s*1px solid var\(--event-meta-ink\);[^}]*color:\s*var\(--event-meta-ink\);[^}]*background:\s*transparent;[^}]*font-weight:\s*400;/s);
+  });
+
+  it("gives event labels more horizontal room without increasing their fixed height", () => {
+    expect(styles).toMatch(/\.event__group\s*\{[^}]*height:\s*var\(--space-6\);[^}]*padding:\s*0\s+var\(--space-2\);[^}]*font-size:\s*clamp\(0\.875rem,\s*0\.9vw,\s*1rem\);/s);
   });
 
   it("makes the compact all-day dash smaller and quieter than a timed event", () => {

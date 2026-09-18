@@ -50,6 +50,19 @@ describe("Family Display", () => {
     expect(summary.lastElementChild).toHaveClass("meal");
   });
 
+  it("migrates a pre-football v2 snapshot before an offline cold start", async () => {
+    const previousPayload: Record<string, unknown> = { ...payload };
+    delete previousPayload.nextMatch;
+    localStorage.setItem("family-display:last-good:v2", JSON.stringify({ payload: previousPayload, receivedAt: "2026-08-27T18:42:00+01:00" }));
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
+
+    render(<App />);
+
+    expect(await screen.findByRole("heading", { name: "Today · Thu 27 August" })).toBeVisible();
+    expect(screen.queryByLabelText(/Next West Ham match:/)).not.toBeInTheDocument();
+    expect(screen.getByText("Last updated 18:42 · offline")).toBeVisible();
+  });
+
   it("renders a valid browser snapshot as stale on an offline cold start", async () => {
     localStorage.setItem("family-display:last-good:v2", JSON.stringify({ payload, receivedAt: "2026-08-27T18:42:00+01:00" }));
     vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
@@ -413,6 +426,20 @@ describe("Family Display", () => {
     expect(within(event).getByText(longTitle)).toBeVisible();
   });
 
+  it("renders the next West Ham fixture directly beneath dinner with home and away crests", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    const match = await screen.findByLabelText("Next West Ham match: Millwall versus West Ham United, Saturday 19 September at 12:30");
+    expect(match.previousElementSibling).toHaveClass("meal--today");
+    expect(within(match).getByText("Next West Ham game")).toBeVisible();
+    expect(within(match).getByRole("img", { name: "Millwall crest" })).toHaveAttribute("src", "/api/football/crest/133634");
+    expect(within(match).getByRole("img", { name: "West Ham United crest" })).toHaveAttribute("src", "/api/football/crest/133636");
+    expect(within(match).getByText("Millwall").closest(".next-match__team")).toHaveClass("next-match__team--home");
+    expect(within(match).getByText("West Ham United").closest(".next-match__team")).toHaveClass("next-match__team--away");
+    expect(within(match).getByText("12:30").closest("time")).toHaveAttribute("datetime", "2026-09-19T12:30:00+01:00");
+  });
+
   it("renders the morning quote inside today's primary panel", async () => {
     const withQuote = { ...payload, morningQuote: { text: "Do the work in front of you.", attribution: "Marcus Aurelius" } };
     vi.mocked(fetch).mockResolvedValueOnce(response(withQuote));
@@ -420,7 +447,8 @@ describe("Family Display", () => {
     render(<App />);
 
     const quote = await screen.findByRole("blockquote", { name: "Morning quote" });
-    expect(quote.previousElementSibling).toHaveClass("meal--today");
+    expect(quote.previousElementSibling).toHaveClass("next-match");
+    expect(quote.previousElementSibling?.previousElementSibling).toHaveClass("meal--today");
     expect(quote).toHaveTextContent("Do the work in front of you.");
     expect(quote).toHaveTextContent("Marcus Aurelius");
   });

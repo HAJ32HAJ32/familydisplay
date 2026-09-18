@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { Meal, MorningQuote } from "@family-display/contract";
+import type { FootballMatch, Meal, MorningQuote } from "@family-display/contract";
 import type { DisplayDay, DisplayPayload, EventOccurrence } from "./data/schema";
 import { scheduleDailyReload } from "./data/dailyReload";
 import { useDisplayData } from "./data/useDisplayData";
@@ -194,7 +194,37 @@ function MorningQuoteSummary({ quote }: { quote: MorningQuote }) {
   );
 }
 
-function TodayCard({ day, timezone, morningQuote }: { day: DisplayDay; timezone: string; morningQuote: MorningQuote | null }) {
+function NextMatchSummary({ match, timezone }: { match: FootballMatch; timezone: string }) {
+  const kickoff = new Date(match.kickoff);
+  const date = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: timezone }).format(kickoff);
+  const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone }).format(kickoff);
+  const label = `Next West Ham match: ${match.homeTeam.name} versus ${match.awayTeam.name}, ${date} at ${time}`;
+  return (
+    <section className="next-match" aria-label={label}>
+      <p className="eyebrow">Next West Ham game</p>
+      <div className="next-match__fixture">
+        <div className="next-match__team next-match__team--home">
+          <img src={match.homeTeam.crestUrl} alt={`${match.homeTeam.name} crest`} />
+          <strong title={match.homeTeam.name}>{match.homeTeam.name}</strong>
+        </div>
+        <div className="next-match__kickoff">
+          <time dateTime={match.kickoff}>
+            <span>{date}</span>
+            <strong>{time}</strong>
+          </time>
+          <span className="next-match__competition" title={match.competition}>{match.competition}</span>
+        </div>
+        <div className="next-match__team next-match__team--away">
+          <img src={match.awayTeam.crestUrl} alt={`${match.awayTeam.name} crest`} />
+          <strong title={match.awayTeam.name}>{match.awayTeam.name}</strong>
+        </div>
+      </div>
+      <small>Data and artwork: TheSportsDB</small>
+    </section>
+  );
+}
+
+function TodayCard({ day, timezone, morningQuote, nextMatch }: { day: DisplayDay; timezone: string; morningQuote: MorningQuote | null; nextMatch: FootballMatch | null }) {
   return (
     <section className="today-card">
       <div className="today-card__date">
@@ -211,6 +241,7 @@ function TodayCard({ day, timezone, morningQuote }: { day: DisplayDay; timezone:
       </div>
       <div className="today-card__aside">
         <MealSummary meal={day.meal} today />
+        {nextMatch && <NextMatchSummary match={nextMatch} timezone={timezone} />}
         {morningQuote && <MorningQuoteSummary quote={morningQuote} />}
       </div>
     </section>
@@ -279,7 +310,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
   return (
     <main className="display-board">
       <div className="top-row">
-        <TodayCard day={payload.days[0]!} timezone={payload.timezone} morningQuote={payload.morningQuote} />
+        <TodayCard day={payload.days[0]!} timezone={payload.timezone} morningQuote={payload.morningQuote} nextMatch={payload.nextMatch} />
         <div className="top-row__rail">
           <ColourGuide payload={payload} stale={stale} />
           <YesterdayPanel payload={payload} />
