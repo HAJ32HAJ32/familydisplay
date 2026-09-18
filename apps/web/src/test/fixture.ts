@@ -2,6 +2,13 @@ export const payload = {
   generatedAt: "2026-08-27T18:42:00+01:00",
   timezone: "Europe/London",
   morningQuote: { text: "Do the work in front of you.", attribution: "Marcus Aurelius" },
+  nextMatch: {
+    id: "2501338",
+    competition: "English League Championship",
+    kickoff: "2026-09-19T12:30:00+01:00",
+    homeTeam: { id: "133634", name: "Millwall", crestUrl: "/api/football/crest/133634" },
+    awayTeam: { id: "133636", name: "West Ham United", crestUrl: "/api/football/crest/133636" },
+  },
   yesterday: {
     date: "2026-08-26",
     weekday: "Wed",

@@ -1,4 +1,4 @@
-import { displayPayloadSchema, type DisplayPayload, type EventOccurrence, type Meal, type MorningQuote, type WeatherCondition } from "@family-display/contract";
+import { displayPayloadSchema, type DisplayPayload, type EventOccurrence, type FootballMatch, type Meal, type MorningQuote, type WeatherCondition } from "@family-display/contract";
 import { RefreshCache } from "./cache.js";
 import { createDateWindow, londonTimestamp, weekday } from "./date-window.js";
 import { groupEventsByDate } from "./events.js";
@@ -21,6 +21,7 @@ export interface CalendarSource { load(from: string, to: string): Promise<EventO
 export interface WeatherSource { load(startDate: string, endDate: string): Promise<Map<string, RawWeather>> }
 export interface MealSource { load(startDate: string, endDate: string): Promise<Map<string, Meal>> }
 export interface MorningQuoteSource { load(date: string): Promise<MorningQuote> }
+export interface FootballSource { load(now: Date): Promise<FootballMatch | null> }
 export class DisplayDataUnavailableError extends Error {
   override readonly name = "DisplayDataUnavailableError";
 
@@ -29,9 +30,9 @@ export class DisplayDataUnavailableError extends Error {
   }
 }
 export class DisplayService {
-  private readonly calendarCache: RefreshCache<EventOccurrence[]>; private readonly weatherCache: RefreshCache<Map<string, RawWeather>>; private readonly mealCache: RefreshCache<Map<string, Meal>>; private readonly quoteCache: RefreshCache<MorningQuote>; private lastPayload?: DisplayPayload; private lastMeals?: Map<string, Meal>;
-  constructor(private readonly calendars: CalendarSource, private readonly weather: WeatherSource, private readonly options: { clock?: () => Date; calendarTtlMs?: number; weatherTtlMs?: number; meals?: MealSource; mealTtlMs?: number; morningQuote?: MorningQuoteSource; quoteTtlMs?: number } = {}) {
-    this.calendarCache = new RefreshCache(options.calendarTtlMs ?? 300_000); this.weatherCache = new RefreshCache(options.weatherTtlMs ?? 1_800_000); this.mealCache = new RefreshCache(options.mealTtlMs ?? 300_000); this.quoteCache = new RefreshCache(options.quoteTtlMs ?? 21_600_000);
+  private readonly calendarCache: RefreshCache<EventOccurrence[]>; private readonly weatherCache: RefreshCache<Map<string, RawWeather>>; private readonly mealCache: RefreshCache<Map<string, Meal>>; private readonly quoteCache: RefreshCache<MorningQuote>; private readonly footballCache: RefreshCache<FootballMatch | null>; private lastPayload?: DisplayPayload; private lastMeals?: Map<string, Meal>;
+  constructor(private readonly calendars: CalendarSource, private readonly weather: WeatherSource, private readonly options: { clock?: () => Date; calendarTtlMs?: number; weatherTtlMs?: number; meals?: MealSource; mealTtlMs?: number; morningQuote?: MorningQuoteSource; quoteTtlMs?: number; football?: FootballSource; footballTtlMs?: number } = {}) {
+    this.calendarCache = new RefreshCache(options.calendarTtlMs ?? 300_000); this.weatherCache = new RefreshCache(options.weatherTtlMs ?? 1_800_000); this.mealCache = new RefreshCache(options.mealTtlMs ?? 300_000); this.quoteCache = new RefreshCache(options.quoteTtlMs ?? 21_600_000); this.footballCache = new RefreshCache(options.footballTtlMs ?? 14_400_000);
   }
   async getToday(): Promise<{ payload: DisplayPayload; stale: boolean }> {
     const now = (this.options.clock ?? (() => new Date()))(); const window = createDateWindow(now);
@@ -55,13 +56,19 @@ export class DisplayService {
       try { quoteResult = await this.quoteCache.get(() => this.options.morningQuote!.load(window.dates[0]), window.dates[0]); }
       catch { quoteResult = { value: null, stale: true }; }
     }
+    let footballResult: { value: FootballMatch | null; stale: boolean } = { value: null, stale: false };
+    if (this.options.football) {
+      try { footballResult = await this.footballCache.get(() => this.options.football!.load(now), "west-ham-next"); }
+      catch { footballResult = { value: null, stale: true }; }
+      if (footballResult.value && Date.parse(footballResult.value.kickoff) <= now.getTime()) footballResult = { value: null, stale: footballResult.stale };
+    }
     const grouped = groupEventsByDate(calendarResult.value, [window.yesterday, ...window.dates]);
-    const payload = displayPayloadSchema.parse({ generatedAt: londonTimestamp(now), timezone: "Europe/London", morningQuote: quoteResult.value,
+    const payload = displayPayloadSchema.parse({ generatedAt: londonTimestamp(now), timezone: "Europe/London", morningQuote: quoteResult.value, nextMatch: footballResult.value,
       yesterday: { date: window.yesterday, weekday: weekday(window.yesterday), events: grouped.get(window.yesterday) ?? [] },
       days: window.dates.map((date, index) => { const raw = weatherResult.value.get(date); return { date, weekday: weekday(date), isToday: index === 0,
         weather: raw ? { tempMaxC: Math.round(raw.tempMaxC * 10) / 10, precipitationChance: Math.round(raw.precipitationChance), condition: weatherCondition(raw.weatherCode), outfit: chooseOutfit(raw.tempMaxC, raw.precipitationChance) } : null,
         events: grouped.get(date) ?? [], meal: mealResult.value.get(date) ?? null }; }) });
     this.lastPayload = payload;
-    return { payload, stale: calendarResult.stale || weatherResult.stale || mealResult.stale || quoteResult.stale };
+    return { payload, stale: calendarResult.stale || weatherResult.stale || mealResult.stale || quoteResult.stale || footballResult.stale };
   }
 }

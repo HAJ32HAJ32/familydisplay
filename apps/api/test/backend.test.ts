@@ -158,6 +158,20 @@ describe("display service", () => {
     expect(quote.load).toHaveBeenCalledWith("2026-08-27");
     expect(result.payload.morningQuote).toEqual({ text: "Do the work in front of you.", attribution: "Marcus Aurelius" });
   });
+  it("adds the optional next West Ham match without making football critical to the board", async () => {
+    const nextMatch = {
+      id: "2501338",
+      competition: "English League Championship",
+      kickoff: "2026-09-19T12:30:00+01:00",
+      homeTeam: { id: "133634", name: "Millwall", crestUrl: "/api/football/crest/133634" },
+      awayTeam: { id: "133636", name: "West Ham United", crestUrl: "/api/football/crest/133636" },
+    };
+    const football = { load: vi.fn(async () => nextMatch) };
+    const result = await new DisplayService({ load: async () => [] }, { load: async () => new Map() }, { clock, football }).getToday();
+
+    expect(football.load).toHaveBeenCalledWith(clock());
+    expect(result.payload.nextMatch).toEqual(nextMatch);
+  });
   it("keeps calendar data visible when the optional quote endpoint is unavailable", async () => {
     const morningQuote = { load: async (): Promise<never> => { throw new Error("private quote detail"); } };
     const result = await new DisplayService({ load: async () => [occurrence] }, { load: async () => new Map() }, { clock, morningQuote }).getToday();
@@ -366,9 +380,20 @@ describe("provider adapters", () => {
 });
 
  describe("HTTP routes", () => {
-  const payload = { generatedAt: "2026-08-27T13:00:00+01:00", timezone: "Europe/London" as const, morningQuote: null, yesterday: { date: "2026-08-26", weekday: "Wed" as const, events: [] }, days: ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"].map((date, i) => ({ date, weekday: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][i]!, isToday: i === 0, weather: null, events: [], meal: null })) };
+  const payload = { generatedAt: "2026-08-27T13:00:00+01:00", timezone: "Europe/London" as const, morningQuote: null, nextMatch: null, yesterday: { date: "2026-08-26", weekday: "Wed" as const, events: [] }, days: ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"].map((date, i) => ({ date, weekday: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][i]!, isToday: i === 0, weather: null, events: [], meal: null })) };
   it("serves provider-independent health", async () => { const app = await buildServer({ service: { getToday: async () => { throw new Error("must not run"); } } }); const response = await app.inject({ method: "GET", url: "/healthz" }); expect(response.json()).toEqual({ status: "ok" }); await app.close(); });
   it("serves today with freshness and no-store headers", async () => { const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(200); expect(response.headers["x-data-stale"]).toBe("false"); expect(response.headers["cache-control"]).toBe("no-store"); await app.close(); });
+  it("serves validated team crests from the local origin", async () => {
+    const loadCrest = vi.fn(async () => ({ body: Buffer.from([137, 80, 78, 71]), contentType: "image/png", etag: "crest-v1" }));
+    const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) }, crests: { loadCrest } });
+    const response = await app.inject({ method: "GET", url: "/api/football/crest/133636" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toBe("image/png");
+    expect(response.headers.etag).toBe("crest-v1");
+    expect(response.headers["cache-control"]).toBe("public, max-age=2592000, immutable");
+    expect(loadCrest).toHaveBeenCalledWith("133636");
+    await app.close();
+  });
   it("returns a redacted 503 for provider availability failures", async () => { const app = await buildServer({ service: { getToday: async () => { throw new DisplayDataUnavailableError(); } } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(503); expect(response.body).not.toContain("google"); expect(response.json()).toEqual({ error: { code: "DISPLAY_DATA_UNAVAILABLE", message: "Display data is temporarily unavailable" } }); await app.close(); });
   it("returns a redacted 500 for unexpected failures", async () => { const app = await buildServer({ service: { getToday: async () => { throw new Error("google secret"); } } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(500); expect(response.body).not.toContain("google"); expect(response.json()).toEqual({ error: { code: "INTERNAL_ERROR", message: "Unexpected server error" } }); await app.close(); });
   it("rejects mutation routes", async () => { const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) } }); expect((await app.inject({ method: "POST", url: "/api/today" })).statusCode).toBe(404); await app.close(); });

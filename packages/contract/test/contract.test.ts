@@ -7,7 +7,7 @@ const fixture = JSON.parse(readFileSync(new URL("../fixtures/today.json", import
 const event = { id: "evt_123", title: "Breakfast", start: "2026-08-27T08:00:00+01:00", end: "2026-08-27T08:30:00+01:00", allDay: false, group: "all", location: "" };
 const day = (date: string, weekday: string, isToday = false) => ({ date, weekday, isToday, weather: null, events: [], meal: null });
 const valid = {
-  generatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London", morningQuote: null,
+  generatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London", morningQuote: null, nextMatch: null,
   yesterday: { date: "2026-08-26", weekday: "Wed", events: [event] },
   days: [day("2026-08-27", "Thu", true), day("2026-08-28", "Fri"), day("2026-08-29", "Sat"), day("2026-08-30", "Sun"), day("2026-08-31", "Mon"), day("2026-09-01", "Tue"), day("2026-09-02", "Wed")]
 };
@@ -26,6 +26,16 @@ describe("displayPayloadSchema", () => {
   it("accepts a bounded morning quote for the today panel", () => {
     const withQuote = { ...valid, morningQuote: { text: "Waste no more time arguing what a good person should be. Be one.", attribution: "Marcus Aurelius" } };
     expect(displayPayloadSchema.parse(withQuote).morningQuote).toEqual(withQuote.morningQuote);
+  });
+  it("accepts a bounded next West Ham match with local crest endpoints", () => {
+    const nextMatch = {
+      id: "2501338",
+      competition: "English League Championship",
+      kickoff: "2026-09-19T12:30:00+01:00",
+      homeTeam: { id: "133634", name: "Millwall", crestUrl: "/api/football/crest/133634" },
+      awayTeam: { id: "133636", name: "West Ham United", crestUrl: "/api/football/crest/133636" },
+    };
+    expect(displayPayloadSchema.parse({ ...valid, nextMatch }).nextMatch).toEqual(nextMatch);
   });
   it.each([
     ["invalid group", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "family" }] } }],

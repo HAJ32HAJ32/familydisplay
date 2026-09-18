@@ -7,6 +7,7 @@ import { GoogleCalendarProvider, type CalendarApi } from "./google-calendar-prov
 import { OpenMeteoProvider } from "./open-meteo-provider.js";
 import { SousMealProvider } from "./sous-meal-provider.js";
 import { MorningQuoteProvider } from "./morning-quote-provider.js";
+import { TheSportsDbFootballProvider } from "./thesportsdb-football-provider.js";
 import { buildServer } from "./server.js";
 
 async function main() {
@@ -16,9 +17,10 @@ async function main() {
   const calendarApi = google.calendar({ version: "v3", auth }) as unknown as CalendarApi;
   const meals = config.sous ? new SousMealProvider(config.sous.url, config.sous.token) : undefined;
   const morningQuote = config.morningQuote ? new MorningQuoteProvider(config.morningQuote.url, config.morningQuote.token) : undefined;
-  const service = new DisplayService(new GoogleCalendarProvider(config.calendars, config.eventIdSalt, calendarApi), new OpenMeteoProvider(config.latitude, config.longitude), { calendarTtlMs: config.calendarTtlMs, weatherTtlMs: config.weatherTtlMs, mealTtlMs: config.mealTtlMs, ...(meals ? { meals } : {}), ...(morningQuote ? { morningQuote } : {}) });
+  const football = new TheSportsDbFootballProvider();
+  const service = new DisplayService(new GoogleCalendarProvider(config.calendars, config.eventIdSalt, calendarApi), new OpenMeteoProvider(config.latitude, config.longitude), { calendarTtlMs: config.calendarTtlMs, weatherTtlMs: config.weatherTtlMs, mealTtlMs: config.mealTtlMs, ...(meals ? { meals } : {}), ...(morningQuote ? { morningQuote } : {}), football });
   const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
-  const app = await buildServer({ service, webRoot });
+  const app = await buildServer({ service, crests: football, webRoot });
   const shutdown = async () => { await app.close(); process.exit(0); };
   process.once("SIGINT", shutdown); process.once("SIGTERM", shutdown);
   await app.listen({ host: config.host, port: config.port });
