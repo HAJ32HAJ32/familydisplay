@@ -7,8 +7,8 @@ Deployment status must be established from the live user service and checkout, n
 ## Current behaviour
 
 - Exactly two read-only Google Calendars are configured: Family and BAES.
-- Google event colours map to six visible household groups: grape (`3`) → H + Chantele, blueberry (`9`) → All, basil (`10`) → Rafe, graphite (`8`) → H, banana (`5`) → Chantele, and tangerine (`6`) → Household. Missing or unsupported colours use the source default: All for Family and H + Chantele for BAES.
-- Today shows at most three events; Previous day and each future card show at most one. Additional valid events become a deterministic `+N more` row.
+- Google event colours map to six visible household groups: grape (`3`) → H + Chantele, blueberry (`9`) → All, basil (`10`) → Rafe, graphite (`8`) → H, banana (`5`) → Chantele, and tangerine (`6`) → Home. Missing or unsupported colours use the source default: All for Family and H + Chantele for BAES.
+- Today, Previous day and each future card render every event that fits their measured space. A `+N more` row appears only when remaining events would overflow the available height.
 - All-day events show an em dash visually. Their event row retains an accessible label containing “All day”; compact all-day titles remain on the same bounded row and ellipsize instead of wrapping below the visible card.
 - Open-Meteo supplies seven-day conditions, temperature and precipitation data. Outfit guidance is derived server-side using precipitation-first thresholds.
 - The optional shipped Sous integration supplies dated recipe, takeaway or eating-out meals. The optional shipped morning-quote integration adds a quote to Today. Either feature remains absent when it is not configured.
