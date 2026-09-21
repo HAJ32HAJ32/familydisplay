@@ -11,7 +11,7 @@ const groupLabels: Record<EventOccurrence["group"], { short: string; accessible:
   rafe: { short: "R", accessible: "Rafe" },
   h: { short: "H", accessible: "H" },
   chantele: { short: "C", accessible: "Chantele" },
-  household: { short: "Household", accessible: "Household" },
+  household: { short: "Home", accessible: "Home" },
 };
 
 const fullWeekdays: Record<DisplayDay["weekday"], string> = {
@@ -237,7 +237,7 @@ function TodayCard({ day, timezone, morningQuote, nextMatch }: { day: DisplayDay
       </div>
       <div className="today-card__schedule">
         <p className="eyebrow">Schedule for today</p>
-        <Events events={day.events} timezone={timezone} />
+        <Events events={day.events} timezone={timezone} adaptive />
       </div>
       <div className="today-card__aside">
         <MealSummary meal={day.meal} today />
@@ -276,7 +276,7 @@ const colourGuide = [
   { googleColour: "Basil", group: "Rafe", label: "Rafe", className: "basil" },
   { googleColour: "Graphite", group: "H", label: "H", className: "graphite" },
   { googleColour: "Banana", group: "Chantele", label: "Chantele", className: "banana" },
-  { googleColour: "Tangerine", group: "Household", label: "Household", className: "tangerine" },
+  { googleColour: "Tangerine", group: "Home", label: "Home", className: "tangerine" },
 ] as const;
 
 function ColourGuide({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {

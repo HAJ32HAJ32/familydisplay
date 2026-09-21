@@ -120,6 +120,10 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*flex-start;[^}]*width:\s*fit-content;/s);
   });
 
+  it("adds breathing room between today's weather reading and outfit pill", () => {
+    expect(styles).toMatch(/\.weather:not\(\.weather--compact\) \.outfit\s*\{[^}]*margin-top:\s*var\(--space-2\);/s);
+  });
+
   it("centres today's outfit content inside its full-width pill", () => {
     expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*center;[^}]*width:\s*100%;/s);
   });
@@ -137,6 +141,10 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.outfit \.icon--outfit\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
     expect(styles).toMatch(/\.outfit span\s*\{[^}]*font-size:\s*var\(--text-body\);[^}]*font-weight:\s*700;/s);
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
+  });
+
+  it("lets today's adaptive schedule use only the space left beneath its heading", () => {
+    expect(styles).toMatch(/\.today-card__schedule \.event-list--adaptive\s*\{[^}]*height:\s*auto;[^}]*flex:\s*1\s+1\s+0;/s);
   });
 
   it("keeps compact all-day events on one bounded row without changing timed compact rows", () => {

@@ -178,6 +178,11 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   flex-direction: column;
 }
 
+.today-card__schedule .event-list--adaptive {
+  height: auto;
+  flex: 1 1 0;
+}
+
 .eyebrow {
   display: block;
   margin: 0 0 var(--space-3);
@@ -271,6 +276,8 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 
 .outfit span { font-size: var(--text-body); font-weight: 700; }
+
+.weather:not(.weather--compact) .outfit { margin-top: var(--space-2); }
 
 .weather--compact .outfit {
   grid-column: 1 / -1;

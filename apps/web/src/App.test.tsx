@@ -235,9 +235,9 @@ describe("Family Display", () => {
     expect(screen.getByLabelText("Rafe: Nursery drop-off, 08:30, at Nursery")).toHaveTextContent("08:30");
     expect(screen.getByLabelText("H: Bins out, 07:00")).toBeVisible();
     expect(screen.getByLabelText("Chantele: Appointment, 11:00, at Clinic")).toBeVisible();
-    const household = screen.getByLabelText("Household: Cleaner, 10:00");
+    const household = screen.getByLabelText("Home: Cleaner, 10:00");
     expect(household).toBeVisible();
-    expect(household).toHaveTextContent("Household");
+    expect(household).toHaveTextContent("Home");
     expect(household).toHaveClass("event--household");
     expect(screen.getAllByText("Nothing planned")).toHaveLength(3);
     expect(screen.getByLabelText(/Thursday weather: Rain, maximum 19 degrees Celsius/)).toBeVisible();
@@ -265,35 +265,42 @@ describe("Family Display", () => {
     expect(textGroup).toHaveTextContent("Tonight’s mealDinner not set");
   });
 
-  it("retains today's deterministic cap while future cards defer to measured capacity", async () => {
+  it("renders every today event when the schedule has capacity", async () => {
+    vi.spyOn(Element.prototype, "clientHeight", "get").mockImplementation(function (this: Element) {
+      return this.closest(".today-card__schedule") && this.classList.contains("event-list--adaptive") ? 360 : 0;
+    });
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockImplementation(function (this: Element) {
+      return this.classList.contains("event") ? 40 : 0;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const height = this.classList.contains("event-overflow") ? 32 : this.classList.contains("event") ? 40 : 0;
+      return { x: 0, y: 0, width: 100, height, top: 0, right: 100, bottom: height, left: 0, toJSON: () => ({}) };
+    });
     const crowded = {
       ...payload,
-      days: payload.days.map((day, dayIndex) => {
-        const count = dayIndex === 0 ? 6 : dayIndex === 1 ? 4 : 0;
-        if (count === 0) return day;
-        return {
-          ...day,
-          events: Array.from({ length: count }, (_, index) => ({
-            ...day.events[dayIndex === 0 ? 1 : 0]!,
-            id: `evt_crowded_${dayIndex}_${index}`,
-            title: `${dayIndex === 0 ? "Today" : "Future"} event ${index + 1}`,
-            start: `2026-08-${dayIndex === 0 ? "27" : "28"}T${String(8 + index).padStart(2, "0")}:00:00+01:00`,
-            end: `2026-08-${dayIndex === 0 ? "27" : "28"}T${String(9 + index).padStart(2, "0")}:00:00+01:00`,
-            allDay: false,
-          })),
-        };
-      }),
+      days: payload.days.map((day, dayIndex) => dayIndex === 0
+        ? {
+            ...day,
+            events: Array.from({ length: 6 }, (_, index) => ({
+              ...day.events[1]!,
+              id: `evt_today_${index}`,
+              title: `Today event ${index + 1}`,
+              start: `2026-08-27T${String(8 + index).padStart(2, "0")}:00:00+01:00`,
+              end: `2026-08-27T${String(9 + index).padStart(2, "0")}:00:00+01:00`,
+              allDay: false,
+            })),
+          }
+        : day),
     };
     vi.mocked(fetch).mockResolvedValueOnce(response(crowded));
 
     render(<App />);
 
     expect(await screen.findByText("Today event 1")).toBeVisible();
-    expect(screen.getByText("Today event 3")).toBeVisible();
-    expect(screen.queryByText("Today event 4")).not.toBeInTheDocument();
-    expect(screen.getByText("Future event 1")).toBeVisible();
-    expect(screen.getByText("Future event 4")).toBeVisible();
-    expect(screen.getByText("+3 more")).toBeVisible();
+    const todayList = screen.getByText("Today event 1").closest("ul")!;
+    await waitFor(() => expect(todayList).toHaveAttribute("data-visible-events", "6"));
+    expect(screen.getByText("Today event 6")).toBeVisible();
+    expect(within(todayList).queryByText(/more$/)).not.toBeInTheDocument();
   });
 
   it("renders every future event when the card has capacity", async () => {
@@ -493,7 +500,8 @@ describe("Family Display", () => {
     expect(screen.getByLabelText("Basil: Rafe")).toBeVisible();
     expect(screen.getByLabelText("Graphite: H")).toBeVisible();
     expect(screen.getByLabelText("Banana: Chantele")).toBeVisible();
-    expect(screen.getByLabelText("Tangerine: Household")).toBeVisible();
+    expect(screen.getByLabelText("Tangerine: Home")).toBeVisible();
+    expect(within(legend).getByText("Home", { exact: true })).toBeVisible();
     expect(within(legend).getByText("H + C", { exact: true })).toBeVisible();
     expect(legend).not.toHaveTextContent("Grape");
     expect(legend).not.toHaveTextContent("Blueberry");

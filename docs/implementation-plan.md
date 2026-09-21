@@ -63,7 +63,7 @@ Recognized event `colorId` values override the source default:
 | Basil | `10` | Rafe |
 | Graphite | `8` | H |
 | Banana | `5` | Chantele |
-| Tangerine | `6` | Household |
+| Tangerine | `6` | Home |
 
 The adapter uses `calendar.readonly`, expanded recurring events and pagination. Cancelled and self-declined events are removed; blank titles become `Untitled event`. Events are assigned to every local day they overlap and sorted all-day first, then by start, end, title and opaque ID.
 
