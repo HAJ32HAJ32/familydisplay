@@ -246,6 +246,25 @@ describe("display service", () => {
     const service = new DisplayService({ load: async () => { if (fail) throw new Error("private"); return [occurrence]; } }, { load: async () => new Map() }, { clock, calendarTtlMs: 0 });
     const first = await service.getToday(); fail = true; expect(await service.getToday()).toEqual({ payload: first.payload, stale: true });
   });
+  it("advances the London date with cached calendar events when refresh fails after midnight", async () => {
+    let current = new Date("2026-08-27T22:59:00Z");
+    let calendarCalls = 0;
+    const fridayEvent = { ...occurrence, id: "evt_friday", start: "2026-08-28T12:00:00+01:00", end: "2026-08-28T13:00:00+01:00" };
+    const service = new DisplayService(
+      { load: async () => { calendarCalls += 1; if (calendarCalls > 1) throw new Error("private"); return [fridayEvent]; } },
+      { load: async () => new Map() },
+      { clock: () => current, calendarTtlMs: 300_000 }
+    );
+
+    await service.getToday();
+    current = new Date("2026-08-27T23:01:00Z");
+    const result = await service.getToday();
+
+    expect(result.stale).toBe(true);
+    expect(result.payload.generatedAt).toBe("2026-08-28T00:01:00+01:00");
+    expect(result.payload.days[0]).toMatchObject({ date: "2026-08-28", isToday: true, events: [fridayEvent] });
+    expect(result.payload.yesterday.date).toBe("2026-08-27");
+  });
   it("refreshes both provider caches when the London date changes", async () => {
     let current = new Date("2026-08-27T22:59:00Z");
     let calendarCalls = 0;
