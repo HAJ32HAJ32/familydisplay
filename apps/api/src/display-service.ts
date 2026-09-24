@@ -30,15 +30,16 @@ export class DisplayDataUnavailableError extends Error {
   }
 }
 export class DisplayService {
-  private readonly calendarCache: RefreshCache<EventOccurrence[]>; private readonly weatherCache: RefreshCache<Map<string, RawWeather>>; private readonly mealCache: RefreshCache<Map<string, Meal>>; private readonly quoteCache: RefreshCache<MorningQuote>; private readonly footballCache: RefreshCache<FootballMatch | null>; private lastPayload?: DisplayPayload; private lastMeals?: Map<string, Meal>;
+  private readonly calendarCache: RefreshCache<EventOccurrence[]>; private readonly weatherCache: RefreshCache<Map<string, RawWeather>>; private readonly mealCache: RefreshCache<Map<string, Meal>>; private readonly quoteCache: RefreshCache<MorningQuote>; private readonly footballCache: RefreshCache<FootballMatch | null>; private lastCalendarEvents?: EventOccurrence[]; private lastMeals?: Map<string, Meal>;
   constructor(private readonly calendars: CalendarSource, private readonly weather: WeatherSource, private readonly options: { clock?: () => Date; calendarTtlMs?: number; weatherTtlMs?: number; meals?: MealSource; mealTtlMs?: number; morningQuote?: MorningQuoteSource; quoteTtlMs?: number; football?: FootballSource; footballTtlMs?: number } = {}) {
     this.calendarCache = new RefreshCache(options.calendarTtlMs ?? 300_000); this.weatherCache = new RefreshCache(options.weatherTtlMs ?? 1_800_000); this.mealCache = new RefreshCache(options.mealTtlMs ?? 300_000); this.quoteCache = new RefreshCache(options.quoteTtlMs ?? 21_600_000); this.footballCache = new RefreshCache(options.footballTtlMs ?? 14_400_000);
   }
   async getToday(): Promise<{ payload: DisplayPayload; stale: boolean }> {
     const now = (this.options.clock ?? (() => new Date()))(); const window = createDateWindow(now);
-    let calendarResult;
+    let calendarResult: { value: EventOccurrence[]; stale: boolean };
     try { calendarResult = await this.calendarCache.get(() => this.calendars.load(window.from.toISO()!, window.to.toISO()!), `${window.from.toISO()}|${window.to.toISO()}`); }
-    catch { if (this.lastPayload) return { payload: this.lastPayload, stale: true }; throw new DisplayDataUnavailableError(); }
+    catch { if (this.lastCalendarEvents) calendarResult = { value: this.lastCalendarEvents, stale: true }; else throw new DisplayDataUnavailableError(); }
+    this.lastCalendarEvents = calendarResult.value;
     let weatherResult: { value: Map<string, RawWeather>; stale: boolean };
     try { weatherResult = await this.weatherCache.get(() => this.weather.load(window.dates[0], window.dates[6]), `${window.dates[0]}|${window.dates[6]}`); }
     catch { weatherResult = { value: new Map(), stale: true }; }
@@ -68,7 +69,6 @@ export class DisplayService {
       days: window.dates.map((date, index) => { const raw = weatherResult.value.get(date); return { date, weekday: weekday(date), isToday: index === 0,
         weather: raw ? { tempMaxC: Math.round(raw.tempMaxC * 10) / 10, precipitationChance: Math.round(raw.precipitationChance), condition: weatherCondition(raw.weatherCode), outfit: chooseOutfit(raw.tempMaxC, raw.precipitationChance) } : null,
         events: grouped.get(date) ?? [], meal: mealResult.value.get(date) ?? null }; }) });
-    this.lastPayload = payload;
     return { payload, stale: calendarResult.stale || weatherResult.stale || mealResult.stale || quoteResult.stale || footballResult.stale };
   }
 }
