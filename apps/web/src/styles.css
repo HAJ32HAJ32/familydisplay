@@ -43,7 +43,7 @@
   --group-all: #75a0f5;
   --group-rafe: #68c463;
   --group-h: #465166;
-  --group-chantele: #eacb62;
+  --group-chantele: #a31352;
   --group-household: #efa766;
 
   --radius-sm: 0.5rem;
@@ -352,7 +352,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 .event--all { --event-fill: var(--group-all); background: var(--group-all); }
 .event--rafe { --event-fill: var(--group-rafe); background: var(--group-rafe); }
 .event--h { --event-fill: var(--group-h); --event-ink: var(--event-ink-light); background: var(--group-h); }
-.event--chantele { --event-fill: var(--group-chantele); background: var(--group-chantele); }
+.event--chantele { --event-fill: var(--group-chantele); --event-ink: var(--event-ink-light); background: var(--group-chantele); }
 .event--household { --event-fill: var(--group-household); background: var(--group-household); }
 
 .event-list--compact .event {
@@ -627,7 +627,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 .colour-guide__swatch--blueberry { background: var(--group-all); }
 .colour-guide__swatch--basil { background: var(--group-rafe); }
 .colour-guide__swatch--graphite { background: var(--group-h); }
-.colour-guide__swatch--banana { background: var(--group-chantele); }
+.colour-guide__swatch--beetroot { background: var(--group-chantele); }
 .colour-guide__swatch--tangerine { background: var(--group-household); }
 .freshness {
   flex: 0 0 auto;

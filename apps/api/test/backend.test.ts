@@ -295,6 +295,18 @@ describe("provider adapters", () => {
     expect(events).toHaveLength(2); expect(list).toHaveBeenCalledTimes(2);
     expect(list.mock.calls[0]?.[0]).toMatchObject({ calendarId: "private-calendar", singleEvents: true, timeZone: "Europe/London", timeMin: "2026-08-26T00:00:00+01:00", timeMax: "2026-09-03T00:00:00+01:00" });
   });
+  it("maps the calendar-specific Beetroot event label to Chantele", async () => {
+    const beetrootLabelId = "11111111-2222-3333-4444-555555555555";
+    const get = vi.fn(async () => ({ data: { labelProperties: { eventLabels: [{ id: beetrootLabelId, backgroundColor: "#ad1457" }] } } }));
+    const list = vi.fn(async () => ({ data: { items: [{ id: "one", eventLabelId: beetrootLabelId, summary: "Appointment", start: { dateTime: "2026-08-27T09:00:00+01:00" }, end: { dateTime: "2026-08-27T10:00:00+01:00" } }] } }));
+    const provider = new GoogleCalendarProvider([mapping], "salt", { calendars: { get }, events: { list } } as never);
+
+    const events = await provider.load("2026-08-26T00:00:00+01:00", "2026-09-03T00:00:00+01:00");
+
+    expect(get).toHaveBeenCalledWith({ calendarId: "private-calendar" }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+    expect(events).toHaveLength(1);
+    expect(events[0]?.group).toBe("chantele");
+  });
   it("times out a non-settling Google request and aborts it", async () => {
     let signal: AbortSignal | undefined;
     const list = vi.fn((_args: unknown, options?: { signal?: AbortSignal }) => {

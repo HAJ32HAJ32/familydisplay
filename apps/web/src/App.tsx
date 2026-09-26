@@ -275,7 +275,7 @@ const colourGuide = [
   { googleColour: "Blueberry", group: "All", label: "All", className: "blueberry" },
   { googleColour: "Basil", group: "Rafe", label: "Rafe", className: "basil" },
   { googleColour: "Graphite", group: "H", label: "H", className: "graphite" },
-  { googleColour: "Banana", group: "Chantele", label: "Chantele", className: "banana" },
+  { googleColour: "Beetroot", group: "Chantele", label: "Chantele", className: "beetroot" },
   { googleColour: "Tangerine", group: "Home", label: "Home", className: "tangerine" },
 ] as const;
 
