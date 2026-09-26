@@ -51,11 +51,16 @@ const eventColours = [
   ["all", "#75a0f5", "#0b1322"],
   ["rafe", "#68c463", "#0b1322"],
   ["h", "#465166", "#f8fafc"],
-  ["chantele", "#eacb62", "#0b1322"],
+  ["chantele", "#a31352", "#f8fafc"],
   ["household", "#efa766", "#0b1322"],
 ] as const;
 
 describe("visual system", () => {
+  it("uses Beetroot for Chantele's legend swatch", () => {
+    expect(styles).toMatch(/\.colour-guide__swatch--beetroot\s*\{[^}]*background:\s*var\(--group-chantele\);/s);
+    expect(styles).not.toContain("colour-guide__swatch--banana");
+  });
+
   it("makes today's date number bold", () => {
     expect(styles).toMatch(/\.today-card__number\s*\{[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
   });

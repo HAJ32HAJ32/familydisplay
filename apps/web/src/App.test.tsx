@@ -499,7 +499,8 @@ describe("Family Display", () => {
     expect(screen.getByLabelText("Blueberry: All")).toBeVisible();
     expect(screen.getByLabelText("Basil: Rafe")).toBeVisible();
     expect(screen.getByLabelText("Graphite: H")).toBeVisible();
-    expect(screen.getByLabelText("Banana: Chantele")).toBeVisible();
+    expect(screen.getByLabelText("Beetroot: Chantele")).toBeVisible();
+    expect(screen.queryByLabelText("Banana: Chantele")).not.toBeInTheDocument();
     expect(screen.getByLabelText("Tangerine: Home")).toBeVisible();
     expect(within(legend).getByText("Home", { exact: true })).toBeVisible();
     expect(within(legend).getByText("H + C", { exact: true })).toBeVisible();
