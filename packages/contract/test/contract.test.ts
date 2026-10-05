@@ -7,7 +7,8 @@ const fixture = JSON.parse(readFileSync(new URL("../fixtures/today.json", import
 const event = { id: "evt_123", title: "Breakfast", start: "2026-08-27T08:00:00+01:00", end: "2026-08-27T08:30:00+01:00", allDay: false, group: "all", location: "" };
 const day = (date: string, weekday: string, isToday = false) => ({ date, weekday, isToday, weather: null, events: [], meal: null });
 const valid = {
-  generatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London", morningQuote: null, nextMatch: null,
+  generatedAt: "2026-08-27T07:00:00+01:00", calendarUpdatedAt: "2026-08-27T07:00:00+01:00", timezone: "Europe/London", morningQuote: null, nextMatch: null,
+  binReminder: null, countdowns: [], multiDay: [],
   yesterday: { date: "2026-08-26", weekday: "Wed", events: [event] },
   days: [day("2026-08-27", "Thu", true), day("2026-08-28", "Fri"), day("2026-08-29", "Sat"), day("2026-08-30", "Sun"), day("2026-08-31", "Mon"), day("2026-09-01", "Tue"), day("2026-09-02", "Wed")]
 };
@@ -16,7 +17,7 @@ describe("displayPayloadSchema", () => {
   it("accepts the checked-in canonical fixture", () => expect(displayPayloadSchema.parse(fixture)).toEqual(fixture));
   it("accepts the canonical shape", () => expect(displayPayloadSchema.parse(valid)).toEqual(valid));
   it("accepts a normalised weather condition", () => {
-    const withWeather = { ...valid, days: valid.days.map((value, index) => index === 0 ? { ...value, weather: { tempMaxC: 16, precipitationChance: 70, condition: "rain", outfit: "raincoat" } } : value) };
+    const withWeather = { ...valid, days: valid.days.map((value, index) => index === 0 ? { ...value, weather: { tempMaxC: 16, tempMinC: 9, precipitationChance: 70, rainFrom: "15:00", sunrise: "06:12", sunset: "19:54", condition: "rain", outfit: "raincoat" } } : value) };
     expect(displayPayloadSchema.parse(withWeather).days[0]?.weather).toMatchObject({ condition: "rain" });
   });
   it("accepts the household group", () => {
@@ -37,6 +38,15 @@ describe("displayPayloadSchema", () => {
     };
     expect(displayPayloadSchema.parse({ ...valid, nextMatch }).nextMatch).toEqual(nextMatch);
   });
+  it("accepts the Tuesday bin reminder, countdowns and multi-day events", () => {
+    const withExtras = {
+      ...valid,
+      binReminder: { bin: "recycling", collectionDate: "2026-09-02" },
+      countdowns: [{ id: "evt_half_term", title: "Half term", date: "2026-10-26", daysAway: 60, group: "all" }],
+      multiDay: [{ ...event, id: "evt_trip", allDay: true, start: "2026-08-28T00:00:00+01:00", end: "2026-08-31T00:00:00+01:00", firstDate: "2026-08-28", lastDate: "2026-08-30" }]
+    };
+    expect(displayPayloadSchema.parse(withExtras)).toEqual(withExtras);
+  });
   it.each([
     ["invalid group", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, group: "family" }] } }],
     ["timestamp without offset", { ...valid, yesterday: { ...valid.yesterday, events: [{ ...event, start: "2026-08-27T08:00:00" }] } }],
@@ -45,6 +55,10 @@ describe("displayPayloadSchema", () => {
     ["non-consecutive dates", { ...valid, days: valid.days.map((d, i) => i === 4 ? { ...d, date: "2026-09-10" } : d) }],
     ["today marker outside index zero", { ...valid, days: valid.days.map((d, i) => ({ ...d, isToday: i === 1 })) }],
     ["impossible date", { ...valid, days: valid.days.map((d, i) => i === 2 ? { ...d, date: "2026-02-30" } : d) }],
-    ["unknown key", { ...valid, secret: "nope" }]
+    ["unknown key", { ...valid, secret: "nope" }],
+    ["unknown bin", { ...valid, binReminder: { bin: "garden", collectionDate: "2026-09-02" } }],
+    ["invalid rain time", { ...valid, days: valid.days.map((d, i) => i === 0 ? { ...d, weather: { tempMaxC: 16, tempMinC: null, precipitationChance: 70, rainFrom: "3pm", sunrise: null, sunset: null, condition: "rain", outfit: "raincoat" } } : d) }],
+    ["single-date multi-day event", { ...valid, multiDay: [{ ...event, firstDate: "2026-08-27", lastDate: "2026-08-27" }] }],
+    ["too many countdowns", { ...valid, countdowns: Array.from({ length: 5 }, (_, index) => ({ id: `evt_${index}`, title: "Trip", date: "2026-09-10", daysAway: 14, group: "all" })) }]
   ])("rejects %s", (_name, value) => expect(() => displayPayloadSchema.parse(value)).toThrow());
 });

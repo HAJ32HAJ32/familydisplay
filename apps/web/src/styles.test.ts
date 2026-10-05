@@ -7,8 +7,10 @@ const styles = readFileSync(resolve(process.cwd(), "src/styles.css"), "utf8");
 const responsiveStyles = styles.slice(styles.indexOf("@media (max-width: 900px)"));
 
 describe("top-right colour guide", () => {
-  it("stacks the guide above yesterday in a dedicated rail", () => {
-    expect(styles).toMatch(/\.top-row__rail\s*\{[^}]*grid-template-rows:\s*auto\s+minmax\(0,\s*1fr\);/s);
+  it("stacks the guide and countdowns above yesterday in a dedicated rail", () => {
+    expect(styles).toMatch(/\.top-row__rail\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;/s);
+    expect(styles).toMatch(/\.top-row__rail > \.rail-card\s*\{[^}]*flex:\s*0\s+0\s+auto;/s);
+    expect(styles).toMatch(/\.top-row__rail > \.yesterday-panel\s*\{[^}]*flex:\s*1\s+1\s+0;/s);
     expect(styles).toMatch(/\.colour-guide\s*\{[^}]*flex-direction:\s*column;/s);
   });
 
@@ -61,8 +63,18 @@ describe("visual system", () => {
     expect(styles).not.toContain("colour-guide__swatch--banana");
   });
 
-  it("makes today's date number bold", () => {
-    expect(styles).toMatch(/\.today-card__number\s*\{[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
+  it("makes today's clock bold with steady digits", () => {
+    expect(styles).toMatch(/\.today-card__clock\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
+  });
+
+  it("only nudges the board for burn-in protection on the wide TV layout", () => {
+    expect(styles).toMatch(/@keyframes burn-in-shift/);
+    expect(styles).toMatch(/@media \(min-width: 901px\)\s*\{[^@]*\.display-board\s*\{\s*animation:\s*burn-in-shift 30m step-end infinite;/s);
+  });
+
+  it("lines multi-day bars up with the upcoming cards using a shared grid", () => {
+    expect(styles).toMatch(/\.future-grid--spans \.future-day\s*\{[^}]*grid-row:\s*1\s*\/\s*-1;[^}]*grid-template-rows:\s*subgrid;/s);
+    expect(styles).toMatch(/\.future-grid--spans \.future-day > :last-child\s*\{[^}]*grid-row:\s*-2\s*\/\s*-1;/s);
   });
 
   it("gives yesterday a greyer, lower-hierarchy surface and enough room for its visible event", () => {
@@ -155,10 +167,8 @@ describe("visual system", () => {
   it("keeps compact all-day events on one bounded row without changing timed compact rows", () => {
     expect(styles).toMatch(/\.event-list--adaptive\s*\{[^}]*height:\s*100%;/s);
     expect(styles).toMatch(/\.event-overflow--measure\s*\{[^}]*position:\s*absolute;[^}]*visibility:\s*hidden;/s);
-    expect(styles).toMatch(/\.event-list--compact \.event--all-day\s*\{[^}]*grid-template-columns:\s*auto\s+minmax\(0,\s*1fr\)\s+auto;/s);
-    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__time\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;/s);
-    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__body\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*1;[^}]*overflow:\s*hidden;/s);
-    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__group\s*\{[^}]*grid-column:\s*3;[^}]*grid-row:\s*1;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__body\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;[^}]*overflow:\s*hidden;/s);
+    expect(styles).toMatch(/\.event-list--compact \.event--all-day \.event__group\s*\{[^}]*grid-column:\s*2;[^}]*grid-row:\s*1;/s);
     expect(styles).toMatch(/\.event-list--compact \.event__body\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*grid-row:\s*2;/s);
   });
 
@@ -184,8 +194,12 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.event__group\s*\{[^}]*height:\s*var\(--space-6\);[^}]*padding:\s*0\s+var\(--space-2\);[^}]*font-size:\s*clamp\(0\.875rem,\s*0\.9vw,\s*1rem\);/s);
   });
 
-  it("makes the compact all-day dash smaller and quieter than a timed event", () => {
-    expect(styles).toMatch(/\.event-list--compact \.event__time--all-day\s*\{[^}]*color:\s*var\(--event-meta-ink\);[^}]*font-size:\s*0\.78em;[^}]*font-weight:\s*400;/s);
+  it("labels all-day events in words at a smaller size than a timed event", () => {
+    expect(styles).toMatch(/\.event__time--all-day\s*\{[^}]*font-size:\s*0\.78em;[^}]*white-space:\s*nowrap;/s);
+  });
+
+  it("does not draw em dashes anywhere on the board", () => {
+    expect(styles).not.toContain("—");
   });
 
   it.each([

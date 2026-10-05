@@ -4,6 +4,7 @@ export const groups = ["h-and-chantele", "all", "rafe", "h", "chantele", "househ
 export const outfits = ["tshirt", "long-sleeve", "hoodie", "coat", "raincoat"] as const;
 export const weatherConditions = ["clear", "partly-cloudy", "cloudy", "fog", "drizzle", "rain", "snow", "showers", "thunderstorm"] as const;
 export const weekdays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
+export const bins = ["recycling", "general"] as const;
 
 const datePattern = /^\d{4}-\d{2}-\d{2}$/;
 const offsetTimestampPattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -14,13 +15,14 @@ const isRealDate = (value: string) => {
   return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month! - 1 && parsed.getUTCDate() === day;
 };
 const localDateSchema = z.string().refine(isRealDate, "Invalid local date");
+const clockTimeSchema = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, "Invalid local time");
 const timestampSchema = z.string().regex(offsetTimestampPattern, "Timestamp requires an explicit offset").refine((value) => Number.isFinite(Date.parse(value)), "Invalid timestamp");
 
 export const groupSchema = z.enum(groups);
 export const outfitSchema = z.enum(outfits);
 export const weatherConditionSchema = z.enum(weatherConditions);
 export const weekdaySchema = z.enum(weekdays);
-export const eventOccurrenceSchema = z.strictObject({
+const eventFields = {
   id: z.string().trim().min(1).max(200),
   title: z.string().trim().min(1).max(200),
   start: timestampSchema,
@@ -28,13 +30,23 @@ export const eventOccurrenceSchema = z.strictObject({
   allDay: z.boolean(),
   group: groupSchema,
   location: z.string().trim().max(300)
-}).superRefine((event, context) => {
+};
+const endsAfterStart = (event: { start: string; end: string }, context: z.RefinementCtx) => {
   if (Date.parse(event.end) <= Date.parse(event.start)) context.addIssue({ code: "custom", message: "Event end must be after start", path: ["end"] });
+};
+export const eventOccurrenceSchema = z.strictObject(eventFields).superRefine(endsAfterStart);
+export const multiDayEventSchema = z.strictObject({ ...eventFields, firstDate: localDateSchema, lastDate: localDateSchema }).superRefine((event, context) => {
+  endsAfterStart(event, context);
+  if (event.lastDate <= event.firstDate) context.addIssue({ code: "custom", message: "A multi-day event must span more than one date", path: ["lastDate"] });
 });
 
 export const weatherSummarySchema = z.strictObject({
   tempMaxC: z.number().finite().min(-50).max(60),
+  tempMinC: z.number().finite().min(-50).max(60).nullable(),
   precipitationChance: z.number().int().min(0).max(100),
+  rainFrom: clockTimeSchema.nullable(),
+  sunrise: clockTimeSchema.nullable(),
+  sunset: clockTimeSchema.nullable(),
   condition: weatherConditionSchema,
   outfit: outfitSchema
 });
@@ -59,6 +71,17 @@ export const footballMatchSchema = z.strictObject({
   homeTeam: footballTeamSchema,
   awayTeam: footballTeamSchema
 });
+export const countdownSchema = z.strictObject({
+  id: z.string().trim().min(1).max(200),
+  title: z.string().trim().min(1).max(200),
+  date: localDateSchema,
+  daysAway: z.number().int().min(0).max(366),
+  group: groupSchema
+});
+export const binReminderSchema = z.strictObject({
+  bin: z.enum(bins),
+  collectionDate: localDateSchema
+});
 export const displayDaySchema = z.strictObject({
   date: localDateSchema,
   weekday: weekdaySchema,
@@ -71,9 +94,13 @@ const sevenDaysSchema = z.tuple([displayDaySchema, displayDaySchema, displayDayS
 
 export const displayPayloadSchema = z.strictObject({
   generatedAt: timestampSchema,
+  calendarUpdatedAt: timestampSchema,
   timezone: z.literal("Europe/London"),
   morningQuote: morningQuoteSchema.nullable(),
   nextMatch: footballMatchSchema.nullable(),
+  binReminder: binReminderSchema.nullable(),
+  countdowns: z.array(countdownSchema).max(4),
+  multiDay: z.array(multiDayEventSchema).max(20),
   yesterday: z.strictObject({ date: localDateSchema, weekday: weekdaySchema, events: z.array(eventOccurrenceSchema) }),
   days: sevenDaysSchema
 }).superRefine((payload, context) => {
@@ -96,5 +123,8 @@ export type WeatherSummary = z.infer<typeof weatherSummarySchema>;
 export type Meal = z.infer<typeof mealSchema>;
 export type MorningQuote = z.infer<typeof morningQuoteSchema>;
 export type FootballMatch = z.infer<typeof footballMatchSchema>;
+export type MultiDayEvent = z.infer<typeof multiDayEventSchema>;
+export type Countdown = z.infer<typeof countdownSchema>;
+export type BinReminder = z.infer<typeof binReminderSchema>;
 export type DisplayDay = z.infer<typeof displayDaySchema>;
 export type DisplayPayload = z.infer<typeof displayPayloadSchema>;

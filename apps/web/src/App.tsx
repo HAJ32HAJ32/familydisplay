@@ -1,9 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { FootballMatch, Meal, MorningQuote } from "@family-display/contract";
+import type { BinReminder, Countdown, FootballMatch, Meal, MorningQuote, MultiDayEvent } from "@family-display/contract";
 import type { DisplayDay, DisplayPayload, EventOccurrence } from "./data/schema";
 import { scheduleDailyReload } from "./data/dailyReload";
 import { useDisplayData } from "./data/useDisplayData";
-import { MealIcon, OutfitIcon, WeatherIcon } from "./icons";
+import { useNow, useWideLayout } from "./data/useNow";
+import { BinIcon, DetailIcon, MealIcon, OutfitIcon, WeatherIcon } from "./icons";
 
 const groupLabels: Record<EventOccurrence["group"], { short: string; accessible: string }> = {
   "h-and-chantele": { short: "H + C", accessible: "H and Chantele" },
@@ -38,6 +39,9 @@ const outfitLabels = {
   raincoat: "Raincoat",
 } as const;
 
+// Hide the board's age warning until the calendar has been out of date for an hour.
+const STALE_ALERT_MS = 60 * 60 * 1000;
+
 function datePart(date: string, timezone: string, part: "day" | "month") {
   return new Intl.DateTimeFormat("en-GB", part === "day"
     ? { day: "2-digit", timeZone: timezone }
@@ -50,15 +54,29 @@ function longDate(date: string, timezone: string) {
     .format(new Date(`${date}T12:00:00Z`));
 }
 
-function eventTime(event: EventOccurrence, timezone: string) {
-  if (event.allDay) return "All day";
-  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone })
-    .format(new Date(event.start));
+function shortDate(date: string, timezone: string) {
+  return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: timezone })
+    .format(new Date(`${date}T12:00:00Z`));
 }
 
-function Events({ events, timezone, compact = false, adaptive = false }: { events: EventOccurrence[]; timezone: string; compact?: boolean; adaptive?: boolean }) {
+function clockTime(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone }).format(date);
+}
+
+function localDate(date: Date, timezone: string) {
+  return new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: timezone }).format(date);
+}
+
+function eventTime(event: EventOccurrence, timezone: string) {
+  if (event.allDay) return "All day";
+  return clockTime(new Date(event.start), timezone);
+}
+
+type EventNote = { status?: "now" | "next"; until?: { short: string; long: string } };
+
+function Events({ events, timezone, compact = false, adaptive = false, notes, emptyText = "Nothing planned" }: { events: EventOccurrence[]; timezone: string; compact?: boolean; adaptive?: boolean; notes?: Map<string, EventNote>; emptyText?: string }) {
   const listRef = useRef<HTMLUListElement>(null);
-  const eventsSignature = JSON.stringify(events);
+  const eventsSignature = JSON.stringify([events, notes ? [...notes] : null]);
   const [measurement, setMeasurement] = useState<{ signature: string; count: number | null }>({ signature: eventsSignature, count: null });
   const measuredCount = measurement.signature === eventsSignature ? measurement.count : null;
 
@@ -112,20 +130,29 @@ function Events({ events, timezone, compact = false, adaptive = false }: { event
     };
   }, [adaptive, eventsSignature]);
 
-  if (events.length === 0) return <p className="empty-day">Nothing planned</p>;
+  if (events.length === 0) return <p className="empty-day">{emptyText}</p>;
   const visibleCount = adaptive ? measuredCount ?? events.length : Math.min(events.length, compact ? 1 : 3);
   const visibleEvents = events.slice(0, visibleCount);
   const hiddenCount = events.length - visibleCount;
   return (
     <ul ref={listRef} data-visible-events={visibleCount} className={`event-list${compact ? " event-list--compact" : ""}${adaptive ? " event-list--adaptive" : ""}`}>
       {visibleEvents.map((event) => {
-        const displayedTime = eventTime(event, timezone);
-        const accessibleLabel = `${groupLabels[event.group].accessible}: ${event.title}, ${displayedTime}${event.location ? `, at ${event.location}` : ""}`;
+        const note = notes?.get(event.id);
+        const displayedTime = note?.until ? `Until ${note.until.short}` : eventTime(event, timezone);
+        const spokenTime = note?.until ? `until ${note.until.long}` : displayedTime;
+        const spokenStatus = note?.status === "now" ? ", happening now" : note?.status === "next" ? ", up next" : "";
+        const accessibleLabel = `${groupLabels[event.group].accessible}: ${event.title}, ${spokenTime}${event.location ? `, at ${event.location}` : ""}${spokenStatus}`;
+        const showsWhen = !(compact && event.allDay && !note?.until);
         return (
-          <li className={`event event--${event.group}${event.allDay ? " event--all-day" : ""}`} key={event.id} aria-label={accessibleLabel}>
-            {event.allDay
-              ? <span className="event__time event__time--all-day" aria-hidden="true">—</span>
-              : <time className="event__time" dateTime={event.start}>{displayedTime}</time>}
+          <li className={`event event--${event.group}${event.allDay ? " event--all-day" : ""}${note?.status ? ` event--${note.status}` : ""}`} key={event.id} aria-label={accessibleLabel}>
+            {showsWhen && (
+              <span className="event__when" aria-hidden="true">
+                {event.allDay || note?.until
+                  ? <span className="event__time event__time--all-day">{displayedTime}</span>
+                  : <time className="event__time" dateTime={event.start}>{displayedTime}</time>}
+                {note?.status && <span className="event__status">{note.status === "now" ? "Now" : "Next"}</span>}
+              </span>
+            )}
             <span className="event__body">
               <strong className="event__title" title={event.title}>{event.title}</strong>
               {event.location && <span className="event__location" title={event.location}>{event.location}</span>}
@@ -134,22 +161,53 @@ function Events({ events, timezone, compact = false, adaptive = false }: { event
           </li>
         );
       })}
-      {hiddenCount > 0 && <li className="event-overflow" aria-label={`${hiddenCount} more events`}>+{hiddenCount} more</li>}
+      {hiddenCount > 0 && (
+        <li className="event-overflow" aria-label={`${hiddenCount} ${visibleCount === 0 ? "" : "more "}event${hiddenCount === 1 ? "" : "s"}`}>
+          {visibleCount === 0 ? `${hiddenCount} event${hiddenCount === 1 ? "" : "s"}` : `+${hiddenCount} more`}
+        </li>
+      )}
     </ul>
   );
 }
 
-function Weather({ day, compact = false }: { day: DisplayDay; compact?: boolean }) {
+function Temperatures({ max, min }: { max: number; min: number | null }) {
+  return (
+    <span className="weather__temps">
+      <strong>{max}°</strong>
+      {min !== null && <span className="weather__low">{min}°</span>}
+    </span>
+  );
+}
+
+function Weather({ day, compact = false, now, timezone }: { day: DisplayDay; compact?: boolean; now?: Date; timezone?: string }) {
   if (!day.weather) return <div className="weather weather--missing">Forecast unavailable</div>;
   const { weather } = day;
-  const label = `${fullWeekdays[day.weekday]} weather: ${conditionLabels[weather.condition]}, maximum ${weather.tempMaxC} degrees Celsius, ${weather.precipitationChance}% chance of rain`;
+  const rainingNow = Boolean(now && timezone && weather.rainFrom && weather.rainFrom <= clockTime(now, timezone));
+  const rainText = weather.rainFrom ? rainingNow ? "Rain now" : `Rain from ${weather.rainFrom}` : null;
+  const label = [
+    `${fullWeekdays[day.weekday]} weather: ${conditionLabels[weather.condition]}, maximum ${weather.tempMaxC} degrees Celsius`,
+    weather.tempMinC !== null ? `, minimum ${weather.tempMinC} degrees` : "",
+    `, ${weather.precipitationChance}% chance of rain`,
+    rainText ? `, ${rainText.toLowerCase()}` : "",
+  ].join("");
   return (
     <div className={`weather${compact ? " weather--compact" : ""}`} aria-label={label}>
       <WeatherIcon condition={weather.condition} />
       <div className="weather__reading">
-        <strong>{weather.tempMaxC}°</strong>
-        <span>{conditionLabels[weather.condition]} · {weather.precipitationChance}%</span>
+        <Temperatures max={weather.tempMaxC} min={weather.tempMinC} />
+        <span className="weather__condition">{conditionLabels[weather.condition]} · {weather.precipitationChance}%</span>
       </div>
+      {!compact && (rainText || weather.sunrise || weather.sunset) && (
+        <ul className="weather__details" aria-hidden="true">
+          {rainText && <li className="weather__detail weather__detail--rain"><DetailIcon kind="rain" />{rainText}</li>}
+          {(weather.sunrise || weather.sunset) && (
+            <li className="weather__detail weather__detail--sun">
+              {weather.sunrise && <span><DetailIcon kind="sunrise" />{weather.sunrise}</span>}
+              {weather.sunset && <span><DetailIcon kind="sunset" />{weather.sunset}</span>}
+            </li>
+          )}
+        </ul>
+      )}
       <div className="outfit">
         <OutfitIcon outfit={weather.outfit} />
         <span>{outfitLabels[weather.outfit]}</span>
@@ -189,7 +247,7 @@ function MorningQuoteSummary({ quote }: { quote: MorningQuote }) {
   return (
     <blockquote className="morning-quote" aria-label="Morning quote">
       <p aria-label={`Quote: ${quote.text}`} title={quote.text}>“{quote.text}”</p>
-      <cite aria-label={`Attribution: ${quote.attribution}`} title={quote.attribution}>— {quote.attribution}</cite>
+      <cite aria-label={`Attribution: ${quote.attribution}`} title={quote.attribution}>{quote.attribution}</cite>
     </blockquote>
   );
 }
@@ -197,7 +255,7 @@ function MorningQuoteSummary({ quote }: { quote: MorningQuote }) {
 function NextMatchSummary({ match, timezone }: { match: FootballMatch; timezone: string }) {
   const kickoff = new Date(match.kickoff);
   const date = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone: timezone }).format(kickoff);
-  const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone }).format(kickoff);
+  const time = clockTime(kickoff, timezone);
   const label = `Next West Ham match: ${match.homeTeam.name} versus ${match.awayTeam.name}, ${date} at ${time}`;
   return (
     <section className="next-match" aria-label={label}>
@@ -224,33 +282,96 @@ function NextMatchSummary({ match, timezone }: { match: FootballMatch; timezone:
   );
 }
 
-function TodayCard({ day, timezone, morningQuote, nextMatch }: { day: DisplayDay; timezone: string; morningQuote: MorningQuote | null; nextMatch: FootballMatch | null }) {
+const binLabels = { recycling: "Recycling", general: "General waste" } as const;
+
+function BinReminderSummary({ reminder, timezone }: { reminder: BinReminder; timezone: string }) {
+  const collectionDay = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: timezone }).format(new Date(`${reminder.collectionDate}T12:00:00Z`));
   return (
-    <section className="today-card">
-      <div className="today-card__date">
-        <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
-          <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span>
-          <span className="today-card__number">{datePart(day.date, timezone, "day")}</span>
-          <span className="today-card__month">{datePart(day.date, timezone, "month")}</span>
-        </h2>
-        <Weather day={day} />
-      </div>
-      <div className="today-card__schedule">
-        <p className="eyebrow">Schedule for today</p>
-        <Events events={day.events} timezone={timezone} adaptive />
-      </div>
-      <div className="today-card__aside">
-        <MealSummary meal={day.meal} today />
-        {nextMatch && <NextMatchSummary match={nextMatch} timezone={timezone} />}
-        {morningQuote && <MorningQuoteSummary quote={morningQuote} />}
+    <section className={`bin-reminder bin-reminder--${reminder.bin}`} aria-label={`${binLabels[reminder.bin]} bins out tonight for collection on ${collectionDay}`}>
+      <BinIcon />
+      <div>
+        <strong>{binLabels[reminder.bin]} out tonight</strong>
+        <span>Collection {collectionDay}</span>
       </div>
     </section>
   );
 }
 
-function FutureDay({ day, timezone }: { day: DisplayDay; timezone: string }) {
+function untilLabel(lastDate: string, days: DisplayPayload["days"], timezone: string) {
+  const day = days.find((candidate) => candidate.date === lastDate);
+  return day
+    ? { short: day.weekday, long: fullWeekdays[day.weekday] }
+    : { short: shortDate(lastDate, timezone), long: longDate(lastDate, timezone) };
+}
+
+function todaySchedule(payload: DisplayPayload, now: Date) {
+  const today = payload.days[0]!;
+  const spans = new Map(payload.multiDay.map((event) => [event.id, event]));
+  const notes = new Map<string, EventNote>();
+  const remaining: EventOccurrence[] = [];
+  let doneCount = 0;
+  for (const event of today.events) {
+    const span = spans.get(event.id);
+    if (span && span.lastDate > today.date) {
+      notes.set(event.id, { until: untilLabel(span.lastDate, payload.days, payload.timezone) });
+      remaining.push(event);
+      continue;
+    }
+    if (!event.allDay && Date.parse(event.end) <= now.getTime()) {
+      doneCount += 1;
+      continue;
+    }
+    remaining.push(event);
+  }
+  const timed = remaining.filter((event) => !event.allDay && !notes.has(event.id));
+  const current = timed.filter((event) => Date.parse(event.start) <= now.getTime());
+  current.forEach((event) => notes.set(event.id, { status: "now" }));
+  const next = timed.find((event) => Date.parse(event.start) > now.getTime());
+  if (next) notes.set(next.id, { status: "next" });
+  return { events: remaining, notes, doneCount };
+}
+
+function Clock({ now, timezone }: { now: Date; timezone: string }) {
+  const time = clockTime(now, timezone);
+  return <time className="today-card__clock" dateTime={now.toISOString()} aria-label={`Time ${time}`}>{time}</time>;
+}
+
+function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
+  const day = payload.days[0]!;
+  const timezone = payload.timezone;
+  const schedule = todaySchedule(payload, now);
   return (
-    <section className="future-day" data-testid="future-day">
+    <section className="today-card">
+      <div className="today-card__date">
+        <div className="today-card__when">
+          <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
+            <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span>
+            <span className="today-card__full-date">{longDate(day.date, timezone)}</span>
+          </h2>
+          <Clock now={now} timezone={timezone} />
+        </div>
+        <Weather day={day} now={now} timezone={timezone} />
+      </div>
+      <div className="today-card__schedule">
+        <p className="eyebrow schedule-heading">
+          <span>Schedule for today</span>
+          {schedule.doneCount > 0 && <span className="schedule-heading__done">{schedule.doneCount} done</span>}
+        </p>
+        <Events events={schedule.events} notes={schedule.notes} timezone={timezone} adaptive emptyText={schedule.doneCount > 0 ? "All done for today" : "Nothing planned"} />
+      </div>
+      <div className="today-card__aside">
+        {payload.binReminder && <BinReminderSummary reminder={payload.binReminder} timezone={timezone} />}
+        <MealSummary meal={day.meal} today />
+        {payload.nextMatch && <NextMatchSummary match={payload.nextMatch} timezone={timezone} />}
+        {payload.morningQuote && <MorningQuoteSummary quote={payload.morningQuote} />}
+      </div>
+    </section>
+  );
+}
+
+function FutureDay({ day, timezone, events, column }: { day: DisplayDay; timezone: string; events: EventOccurrence[]; column?: number | undefined }) {
+  return (
+    <section className="future-day" data-testid="future-day" style={column ? { gridColumn: column } : undefined}>
       <div className="future-day__summary">
         <h2 className="future-day__date">
           <span>{day.weekday}</span>
@@ -259,15 +380,96 @@ function FutureDay({ day, timezone }: { day: DisplayDay; timezone: string }) {
         <Weather day={day} compact />
         <MealSummary meal={day.meal} />
       </div>
-      <Events events={day.events} timezone={timezone} compact adaptive />
+      <Events events={events} timezone={timezone} compact adaptive />
     </section>
   );
 }
 
+type PlacedSpan = { event: MultiDayEvent; start: number; end: number; lane: number; continuesBefore: boolean; continuesAfter: boolean };
+
+// Multi-day events become bars across the upcoming cards. Two lanes keep the
+// cards readable; any further overlapping events fall back into each day's list.
+const MAX_SPAN_LANES = 2;
+
+function placeSpans(multiDay: MultiDayEvent[], days: DisplayDay[]) {
+  const first = days[0]!.date;
+  const last = days[days.length - 1]!.date;
+  const laneEnds: number[] = [];
+  const placed: PlacedSpan[] = [];
+  const unplaced: MultiDayEvent[] = [];
+  for (const event of multiDay) {
+    if (event.lastDate < first || event.firstDate > last) continue;
+    const start = event.firstDate < first ? 0 : days.findIndex((day) => day.date === event.firstDate);
+    const end = event.lastDate > last ? days.length - 1 : days.findIndex((day) => day.date === event.lastDate);
+    if (start < 0 || end < start) continue;
+    let lane = laneEnds.findIndex((laneEnd) => laneEnd < start);
+    if (lane === -1 && laneEnds.length >= MAX_SPAN_LANES) {
+      unplaced.push(event);
+      continue;
+    }
+    if (lane === -1) lane = laneEnds.length;
+    laneEnds[lane] = end;
+    placed.push({ event, start, end, lane, continuesBefore: event.firstDate < first, continuesAfter: event.lastDate > last });
+  }
+  return { placed, unplaced, lanes: laneEnds.length };
+}
+
+function SpanBar({ span, days }: { span: PlacedSpan; days: DisplayDay[] }) {
+  const { event } = span;
+  const from = fullWeekdays[days[span.start]!.weekday];
+  const to = fullWeekdays[days[span.end]!.weekday];
+  const label = `${groupLabels[event.group].accessible}: ${event.title}, ${span.continuesBefore ? "continuing" : "from"} ${from} to ${to}${span.continuesAfter ? " and beyond" : ""}`;
+  return (
+    <div
+      className={`span-bar event--${event.group}${span.continuesBefore ? " span-bar--before" : ""}${span.continuesAfter ? " span-bar--after" : ""}`}
+      style={{ gridColumn: `${span.start + 1} / ${span.end + 2}`, gridRow: span.lane + 2 }}
+      aria-label={label}
+      data-testid="span-bar"
+    >
+      <strong className="span-bar__title" title={event.title}>{event.title}</strong>
+      <span className="event__group" aria-hidden="true">{groupLabels[event.group].short}</span>
+    </div>
+  );
+}
+
+function FutureGrid({ payload, wide }: { payload: DisplayPayload; wide: boolean }) {
+  const days = payload.days.slice(1);
+  const { placed, unplaced, lanes } = wide ? placeSpans(payload.multiDay, days) : { placed: [], unplaced: payload.multiDay, lanes: 0 };
+  const eventsFor = (day: DisplayDay) => [
+    ...unplaced.filter((event) => event.firstDate <= day.date && event.lastDate >= day.date)
+      .map(({ id, title, start, end, allDay, group, location }) => ({ id, title, start, end, allDay, group, location })),
+    ...day.events,
+  ];
+  return (
+    <div
+      className={`future-grid${wide ? " future-grid--spans" : ""}`}
+      style={wide ? { gridTemplateRows: `auto ${"auto ".repeat(lanes)}minmax(0, 1fr)` } : undefined}
+    >
+      {days.map((day, index) => <FutureDay day={day} timezone={payload.timezone} events={eventsFor(day)} column={wide ? index + 1 : undefined} key={day.date} />)}
+      {placed.map((span) => <SpanBar span={span} days={days} key={span.event.id} />)}
+    </div>
+  );
+}
+
 function Freshness({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
-  const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: payload.timezone })
-    .format(new Date(payload.generatedAt));
+  const time = clockTime(new Date(payload.generatedAt), payload.timezone);
   return <p className={`freshness${stale ? " freshness--stale" : ""}`}>{stale ? `Last updated ${time} · offline` : `Updated ${time}`}</p>;
+}
+
+function StaleAlert({ payload, now }: { payload: DisplayPayload; now: Date }) {
+  const updatedAt = new Date(payload.calendarUpdatedAt);
+  const outOfDate = now.getTime() - updatedAt.getTime() > STALE_ALERT_MS;
+  const wrongDay = payload.days[0]!.date !== localDate(now, payload.timezone);
+  if (!outOfDate && !wrongDay) return null;
+  const time = clockTime(updatedAt, payload.timezone);
+  const day = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: payload.timezone }).format(updatedAt);
+  const sameDay = localDate(updatedAt, payload.timezone) === localDate(now, payload.timezone);
+  return (
+    <div className="stale-alert" role="alert">
+      <strong>Not updated since {time}{sameDay ? "" : ` on ${day}`}</strong>
+      <span>The calendar may be out of date. Check the display’s connection.</span>
+    </div>
+  );
 }
 
 const colourGuide = [
@@ -282,7 +484,10 @@ const colourGuide = [
 function ColourGuide({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
   return (
     <aside className="colour-guide" aria-label="Google Calendar colour guide">
-      <p className="eyebrow colour-guide__title">Calendar key</p>
+      <div className="colour-guide__header">
+        <p className="eyebrow colour-guide__title">Calendar key</p>
+        <Freshness payload={payload} stale={stale} />
+      </div>
       <div className="colour-guide__items">
         {colourGuide.map((item) => (
           <span className="colour-guide__item" key={item.googleColour} aria-label={`${item.googleColour}: ${item.group}`}>
@@ -291,15 +496,40 @@ function ColourGuide({ payload, stale }: { payload: DisplayPayload; stale: boole
           </span>
         ))}
       </div>
-      <Freshness payload={payload} stale={stale} />
     </aside>
+  );
+}
+
+// The rail is short, so only the three nearest countdowns are shown.
+const VISIBLE_COUNTDOWNS = 3;
+
+function countdownText(daysAway: number) {
+  if (daysAway === 0) return "Today";
+  if (daysAway === 1) return "Tomorrow";
+  return `${daysAway} days`;
+}
+
+function Countdowns({ countdowns }: { countdowns: Countdown[] }) {
+  if (countdowns.length === 0) return null;
+  return (
+    <section className="countdowns" aria-label="Countdowns">
+      <p className="eyebrow">Coming up</p>
+      <ul>
+        {countdowns.slice(0, VISIBLE_COUNTDOWNS).map((countdown) => (
+          <li key={countdown.id} className="countdown" aria-label={`${countdown.title}: ${countdownText(countdown.daysAway).toLowerCase()}`}>
+            <span className={`countdown__dot event--${countdown.group}`} aria-hidden="true" />
+            <strong className="countdown__title" title={countdown.title}>{countdown.title}</strong>
+            <span className="countdown__days">{countdownText(countdown.daysAway)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
 function YesterdayPanel({ payload }: { payload: DisplayPayload }) {
   return (
-    <aside className="yesterday-panel">
-      <p className="eyebrow">Previous day</p>
+    <aside className="yesterday-panel" aria-label="Previous day">
       <h2>Yesterday · {payload.yesterday.weekday} {longDate(payload.yesterday.date, payload.timezone)}</h2>
       <Events events={payload.yesterday.events} timezone={payload.timezone} compact adaptive />
     </aside>
@@ -307,18 +537,22 @@ function YesterdayPanel({ payload }: { payload: DisplayPayload }) {
 }
 
 function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
+  const now = useNow();
+  const wide = useWideLayout();
   return (
     <main className="display-board">
       <div className="top-row">
-        <TodayCard day={payload.days[0]!} timezone={payload.timezone} morningQuote={payload.morningQuote} nextMatch={payload.nextMatch} />
+        <TodayCard payload={payload} now={now} />
         <div className="top-row__rail">
-          <ColourGuide payload={payload} stale={stale} />
+          <section className="rail-card">
+            <ColourGuide payload={payload} stale={stale} />
+            <Countdowns countdowns={payload.countdowns} />
+          </section>
           <YesterdayPanel payload={payload} />
         </div>
       </div>
-      <div className="future-grid">
-        {payload.days.slice(1).map((day) => <FutureDay day={day} timezone={payload.timezone} key={day.date} />)}
-      </div>
+      <FutureGrid payload={payload} wide={wide} />
+      <StaleAlert payload={payload} now={now} />
     </main>
   );
 }

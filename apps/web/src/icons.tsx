@@ -43,3 +43,15 @@ export function MealIcon({ type }: { type: Meal["type"] }) {
   else paths = <><path d="M4 17h16M6 17a6 6 0 0 1 12 0M12 7V5M10 5h4" /></>;
   return <IconFrame testId={`meal-icon-${type}`} className="icon--meal">{paths}</IconFrame>;
 }
+
+export function DetailIcon({ kind }: { kind: "rain" | "sunrise" | "sunset" }) {
+  let paths: ReactNode;
+  if (kind === "rain") paths = <><path d="M3 12a9 9 0 0 1 18 0H3Z" /><path d="M12 12v6a2 2 0 0 1-4 0M12 3v1" /></>;
+  else if (kind === "sunrise") paths = <><path d="M5 17a7 7 0 0 1 14 0M2 21h20M12 3v5M9 6l3-3 3 3" /></>;
+  else paths = <><path d="M5 17a7 7 0 0 1 14 0M2 21h20M12 3v5M9 5l3 3 3-3" /></>;
+  return <IconFrame testId={`detail-icon-${kind}`} className="icon--detail">{paths}</IconFrame>;
+}
+
+export function BinIcon() {
+  return <IconFrame testId="bin-icon" className="icon--bin"><path d="M4 6h16M9 6V4h6v2M6 6l1 14h10l1-14M10 10v6M14 10v6" /></IconFrame>;
+}

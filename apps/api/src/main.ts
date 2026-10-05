@@ -18,7 +18,8 @@ async function main() {
   const meals = config.sous ? new SousMealProvider(config.sous.url, config.sous.token) : undefined;
   const morningQuote = config.morningQuote ? new MorningQuoteProvider(config.morningQuote.url, config.morningQuote.token) : undefined;
   const football = new TheSportsDbFootballProvider();
-  const service = new DisplayService(new GoogleCalendarProvider(config.calendars, config.eventIdSalt, calendarApi), new OpenMeteoProvider(config.latitude, config.longitude), { calendarTtlMs: config.calendarTtlMs, weatherTtlMs: config.weatherTtlMs, mealTtlMs: config.mealTtlMs, ...(meals ? { meals } : {}), ...(morningQuote ? { morningQuote } : {}), football });
+  const calendars = new GoogleCalendarProvider(config.calendars, config.eventIdSalt, calendarApi);
+  const service = new DisplayService(calendars, new OpenMeteoProvider(config.latitude, config.longitude), { calendarTtlMs: config.calendarTtlMs, weatherTtlMs: config.weatherTtlMs, mealTtlMs: config.mealTtlMs, ...(meals ? { meals } : {}), ...(morningQuote ? { morningQuote } : {}), football, countdownCalendar: calendars });
   const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
   const app = await buildServer({ service, crests: football, webRoot });
   const shutdown = async () => { await app.close(); process.exit(0); };

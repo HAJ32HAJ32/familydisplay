@@ -39,3 +39,20 @@ export function groupEventsByDate(events: EventOccurrence[], dates: string[]) {
     }))] as const;
   }));
 }
+export function eventDateSpan(event: Pick<EventOccurrence, "start" | "end">) {
+  const start = DateTime.fromISO(event.start, { setZone: true }).setZone(TIMEZONE);
+  const lastMoment = DateTime.fromISO(event.end, { setZone: true }).setZone(TIMEZONE).minus({ milliseconds: 1 });
+  return { firstDate: start.toISODate()!, lastDate: lastMoment.toISODate()! };
+}
+// Overnight timed events stay on their own days; only all-day runs and
+// events lasting a day or more are treated as spanning several dates.
+export function isMultiDay(event: EventOccurrence) {
+  const { firstDate, lastDate } = eventDateSpan(event);
+  return lastDate > firstDate && (event.allDay || Date.parse(event.end) - Date.parse(event.start) >= 86_400_000);
+}
+const countdownTag = /(^|\s)#countdown\b/i;
+export function hasCountdownTag(title: string) { return countdownTag.test(title); }
+export function withoutCountdownTag(event: EventOccurrence): EventOccurrence {
+  if (!hasCountdownTag(event.title)) return event;
+  return { ...event, title: event.title.replace(new RegExp(countdownTag.source, "gi"), " ").replace(/\s+/g, " ").trim() || "Untitled event" };
+}
