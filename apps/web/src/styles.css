@@ -22,7 +22,7 @@
   /* Local icon hierarchy */
   --icon-sm: 1.5rem;
   --icon-md: 2rem;
-  --icon-lg: 4.5rem;
+  --icon-lg: 3rem;
 
   /* Surfaces and semantic text */
   --background: #0b1322;
@@ -116,7 +116,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 .today-card {
   display: grid;
-  grid-template-columns: minmax(9rem, 0.8fr) minmax(18rem, 1.8fr) minmax(15rem, 1.1fr);
+  grid-template-columns: minmax(9rem, 0.9fr) minmax(18rem, 1.7fr) minmax(15rem, 1.1fr);
   gap: var(--space-6);
   padding: clamp(var(--space-4), 1.6vw, var(--space-8));
   box-shadow: 0 var(--space-4) var(--space-8) rgba(0, 0, 0, 0.2);
@@ -135,11 +135,15 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   gap: var(--space-4);
 }
 
+/* Clock first: every row of the date column shares one left edge, with a
+   hairline between the time and the weather. */
 .today-card__date {
   display: flex;
   align-items: stretch;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
+  gap: var(--space-4);
+  min-height: 0;
   text-align: left;
 }
 
@@ -151,26 +155,16 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 
 .today-card__date h2 {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
   margin: 0;
-  font-weight: 400;
-  line-height: 1.1;
+  color: var(--muted);
+  font-size: var(--text-body);
+  font-weight: 500;
+  line-height: 1.25;
 }
 
 .today-card__weekday {
   color: var(--accent);
-  font-size: var(--text-title);
   font-weight: 650;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-
-.today-card__full-date {
-  color: var(--muted);
-  font-size: var(--text-body);
-  font-weight: 500;
 }
 
 .today-card__clock {
@@ -296,11 +290,23 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   white-space: nowrap;
 }
 
+.weather--today {
+  flex: 1 1 auto;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: start;
+  row-gap: var(--space-4);
+  min-height: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.weather--today .weather__low::before { content: "/ "; }
+
 .weather__details {
   grid-column: 1 / -1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   color: var(--muted);
@@ -308,15 +314,14 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   list-style: none;
 }
 
-.weather__detail,
-.weather__detail span {
-  display: inline-flex;
+.weather__detail {
+  display: grid;
+  grid-template-columns: 1.5rem minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   white-space: nowrap;
 }
 
-.weather__detail--sun { gap: var(--space-4); }
 .weather__detail--rain { color: var(--text); font-weight: 650; }
 
 .outfit {
@@ -324,19 +329,20 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  justify-content: center;
-  width: 100%;
+  justify-content: flex-start;
+  justify-self: start;
+  width: fit-content;
   max-width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--line);
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
+  border: 0;
   border-radius: 999px;
   color: var(--accent);
-  background: rgba(8, 19, 35, 0.5);
+  background: rgba(66, 200, 245, 0.16);
 }
 
 .outfit span { font-size: var(--text-body); font-weight: 700; }
 
-.weather:not(.weather--compact) .outfit { margin-top: var(--space-2); }
+.weather--today .outfit { grid-row: -2 / -1; align-self: end; }
 
 .weather--compact .outfit {
   grid-column: 1 / -1;
@@ -863,6 +869,17 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 @media (min-width: 901px) {
   .app-shell:has(.display-board) { height: 100vh; overflow: hidden; }
   .display-board { animation: burn-in-shift 30m step-end infinite; }
+}
+
+/* Shorter TV layouts (such as 1366×768) tighten the date column's rhythm.
+   When the bin reminder and the West Ham game both need the aside, the
+   quote steps aside so neither is squeezed. */
+@media (min-width: 901px) and (max-height: 900px) {
+  .today-card__date { gap: var(--space-3); }
+  .weather--today { row-gap: var(--space-3); padding-top: var(--space-3); }
+  .weather--today .weather__details { gap: var(--space-1); }
+  .weather--today .outfit { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .today-card__aside:has(.bin-reminder):has(.next-match) .morning-quote { display: none; }
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {

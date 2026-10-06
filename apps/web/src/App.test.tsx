@@ -618,8 +618,8 @@ describe("Family Display", () => {
     const weather = await screen.findByLabelText("Thursday weather: Rain, maximum 19 degrees Celsius, minimum 12 degrees, 65% chance of rain, rain from 15:00");
     expect(within(weather).getByText("12°")).toHaveClass("weather__low");
     expect(within(weather).getByText("Rain from 15:00")).toBeVisible();
-    expect(within(weather).getByText("06:12")).toBeVisible();
-    expect(within(weather).getByText("19:54")).toBeVisible();
+    expect(within(weather).getByText("Sunrise 06:12")).toBeVisible();
+    expect(within(weather).getByText("Sunset 19:54")).toBeVisible();
     expect(screen.getByLabelText(/Friday weather: Clear, maximum 21 degrees Celsius, minimum 13 degrees/)).not.toHaveTextContent("Rain from");
   });
 
@@ -629,6 +629,24 @@ describe("Family Display", () => {
     render(<App />);
 
     expect(await screen.findByText("Rain now")).toBeVisible();
+  });
+
+  it("puts the clock first with the date on one line beneath it", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    const heading = await screen.findByRole("heading", { name: "Today · Thu 27 August" });
+    expect(heading).toHaveTextContent("Thursday 27 August");
+    expect(heading.previousElementSibling).toHaveClass("today-card__clock");
+    expect(heading.closest(".today-card__when")?.nextElementSibling).toHaveClass("weather--today");
+  });
+
+  it("keeps the West Ham game alongside the bin reminder", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...payload, binReminder: { bin: "recycling", collectionDate: "2026-08-28" } }));
+    render(<App />);
+
+    const match = await screen.findByLabelText(/Next West Ham match:/);
+    expect(match.closest(".today-card__aside")?.firstElementChild).toHaveClass("bin-reminder");
   });
 
   it("reminds the household to put the bins out on Tuesday evening", async () => {

@@ -81,7 +81,7 @@ Secrets, raw calendar IDs, attendee data, descriptions, coordinates and upstream
 
 ## Known limitations
 
-- Candidate browser geometry was checked at exactly 1366×768 in Chromium with a busy Tuesday fixture (bin reminder, three countdowns, three multi-day events, a quote and six Today events): board and scroll dimensions are 1366×768, desktop rows are 377px and 328px, and the Today date column, Today aside and rail fit without overflow. When countdowns are present, Previous day may only have room for an “N events” summary. That check used a fallback font because Inter was not installed.
+- Candidate browser geometry was checked in Chromium at 1920×1080 (the TV) and 1366×768 with a busy Tuesday fixture (bin reminder, West Ham game, quote, three countdowns, three multi-day events and six Today events): board and scroll dimensions match the viewport and the Today date column, Today aside and rail fit without overflow. At 1366×768 the quote is hidden when the bin reminder and West Ham game are both showing, and Previous day may only have room for an “N events” summary when countdowns are present. That check used a fallback font because Inter was not installed.
 - Multi-day bars rely on CSS subgrid (Chromium 117 or newer).
 - Physical Pi/TV overscan, clipping, cursor behaviour, viewing-distance readability, wake/reboot recovery, stale operation and midnight rollover remain outstanding.
 - The stale warning appears on the display only; it does not send phone notifications.

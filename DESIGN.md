@@ -46,7 +46,7 @@ typography:
 icons:
   sm: 24px
   md: 32px
-  lg: 72px
+  lg: 48px
 rounded:
   sm: 8px
   md: 12px
@@ -114,17 +114,17 @@ The six event colours preserve the Google Calendar mapping while using tuned chr
 
 Use the exact five responsive type tokens in the frontmatter. They reduce the enlarged baseline by roughly 10–15% while preserving a distance-readable scale. Exceptional strings truncate predictably rather than forcing the general scale down.
 
-Today weather is intentionally stronger than future weather: the Today weather copy uses body size, temperature uses `clamp(2.25rem, 3.2vw, 3.5rem)`, and its weather icon uses the 72px large token. Compact cards use label-sized weather/outfit copy, body-sized temperature, a 32px weather icon and a 24px outfit icon. Today outfit guidance uses body text at weight 700 with a 32px icon.
+Today's date column is laid out clock first: a bold `clamp(3rem, 4.6vw, 4.75rem)` clock, then the weekday (accent) and date on one body-sized line, then a hairline. Below it, every weather row shares the same left edge: the 48px large weather icon beside the `clamp(2.25rem, 2.7vw, 3rem)` high and a muted "/ low", the condition line, a label-sized list of rain timing, sunrise and sunset with a fixed icon column, and the outfit as a left-aligned tinted chip anchored to the bottom (body text at weight 700 with a 32px icon). Compact cards use label-sized weather/outfit copy, body-sized temperature, a 32px weather icon and a 24px outfit icon.
 
 ## Layout
 
 All spacing comes from the four-point scale. Above 900px, the board is locked to the viewport and uses `minmax(0, 1.15fr) minmax(0, 1fr)` rows. The permanent calendar key, freshness and countdowns share one card at the top of the right rail, above Previous day. Upcoming cards share a subgrid so their summaries align and multi-day bars can span several cards. The board shifts by up to two pixels every six minutes to reduce burn-in. At 900px and below, sections enter document flow, stack progressively and may scroll for development access.
 
-The intended desktop acceptance viewport is 1366×768. In Chromium verification with a busy Tuesday fixture, board and scroll dimensions were exactly 1366×768, desktop rows were 377px and 328px, and the Today columns and rail fitted without overflow. Physical Pi/TV acceptance remains a separate outstanding gate.
+The TV runs at 1920×1080; 1366×768 is the smallest supported desktop size. In Chromium verification with a busy Tuesday fixture (bin reminder, West Ham game, quote, countdowns and multi-day events), board and scroll dimensions matched each viewport exactly and the Today columns and rail fitted without overflow. Below 900px of height, the date column's spacing tightens and, when the bin reminder and West Ham game are both showing, the quote is hidden. Physical Pi/TV acceptance remains a separate outstanding gate.
 
 ## Components
 
-- **Today:** weekday, full date and live clock; Open-Meteo condition with high and low temperature, rain timing, sunrise and sunset; prominent outfit guidance; the schedule with a “N done” count and Now/Next markers; the Tuesday bin reminder; optional Sous dinner, next West Ham game and morning quote.
+- **Today:** live clock first, then weekday and date; Open-Meteo condition with high and low temperature, rain timing, sunrise and sunset; prominent outfit guidance; the schedule with a “N done” count and Now/Next markers; the Tuesday bin reminder; optional Sous dinner, next West Ham game and morning quote.
 - **Top-right rail:** one card holding the permanent six-group Calendar key, freshness state and up to three `#countdown` events, above quiet Previous day content.
 - **Upcoming days:** six compact cards with date, weather/outfit (high and low), dinner and events, with multi-day bars spanning the cards between the summaries and event lists.
 - **Event overflow:** each list renders every event that fits its measured space; the rest become a deterministic `+N more` row, or an “N events” summary when none fit.

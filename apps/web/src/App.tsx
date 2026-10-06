@@ -191,7 +191,7 @@ function Weather({ day, compact = false, now, timezone }: { day: DisplayDay; com
     rainText ? `, ${rainText.toLowerCase()}` : "",
   ].join("");
   return (
-    <div className={`weather${compact ? " weather--compact" : ""}`} aria-label={label}>
+    <div className={`weather${compact ? " weather--compact" : " weather--today"}`} aria-label={label}>
       <WeatherIcon condition={weather.condition} />
       <div className="weather__reading">
         <Temperatures max={weather.tempMaxC} min={weather.tempMinC} />
@@ -199,13 +199,9 @@ function Weather({ day, compact = false, now, timezone }: { day: DisplayDay; com
       </div>
       {!compact && (rainText || weather.sunrise || weather.sunset) && (
         <ul className="weather__details" aria-hidden="true">
-          {rainText && <li className="weather__detail weather__detail--rain"><DetailIcon kind="rain" />{rainText}</li>}
-          {(weather.sunrise || weather.sunset) && (
-            <li className="weather__detail weather__detail--sun">
-              {weather.sunrise && <span><DetailIcon kind="sunrise" />{weather.sunrise}</span>}
-              {weather.sunset && <span><DetailIcon kind="sunset" />{weather.sunset}</span>}
-            </li>
-          )}
+          {rainText && <li className="weather__detail weather__detail--rain"><DetailIcon kind="rain" /><span>{rainText}</span></li>}
+          {weather.sunrise && <li className="weather__detail"><DetailIcon kind="sunrise" /><span>Sunrise {weather.sunrise}</span></li>}
+          {weather.sunset && <li className="weather__detail"><DetailIcon kind="sunset" /><span>Sunset {weather.sunset}</span></li>}
         </ul>
       )}
       <div className="outfit">
@@ -344,11 +340,10 @@ function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
     <section className="today-card">
       <div className="today-card__date">
         <div className="today-card__when">
-          <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
-            <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span>
-            <span className="today-card__full-date">{longDate(day.date, timezone)}</span>
-          </h2>
           <Clock now={now} timezone={timezone} />
+          <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
+            <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span> {longDate(day.date, timezone)}
+          </h2>
         </div>
         <Weather day={day} now={now} timezone={timezone} />
       </div>

@@ -129,26 +129,28 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.morning-quote cite\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s);
   });
 
-  it("left-aligns today's date and weather content while the outfit spans the full weather width", () => {
+  it("left-aligns today's date and weather content with the outfit as a left-aligned chip", () => {
     expect(styles).toMatch(/\.today-card__date\s*\{[^}]*align-items:\s*stretch;[^}]*text-align:\s*left;/s);
     expect(styles).toMatch(/\.weather\s*\{[^}]*width:\s*100%;[^}]*text-align:\s*left;/s);
     expect(styles).not.toMatch(/\.weather\s*\{[^}]*justify-items:\s*start;/s);
-    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*width:\s*100%;/s);
+    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-self:\s*start;[^}]*width:\s*fit-content;/s);
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*flex-start;[^}]*width:\s*fit-content;/s);
   });
 
-  it("adds breathing room between today's weather reading and outfit pill", () => {
-    expect(styles).toMatch(/\.weather:not\(\.weather--compact\) \.outfit\s*\{[^}]*margin-top:\s*var\(--space-2\);/s);
+  it("separates today's time from its weather with a hairline and anchors the outfit chip to the bottom", () => {
+    expect(styles).toMatch(/\.weather--today\s*\{[^}]*grid-template-rows:\s*auto\s+auto\s+minmax\(0,\s*1fr\);[^}]*padding-top:\s*var\(--space-4\);[^}]*border-top:\s*1px solid var\(--line\);/s);
+    expect(styles).toMatch(/\.weather--today \.outfit\s*\{\s*grid-row:\s*-2\s*\/\s*-1;\s*align-self:\s*end;/s);
+    expect(styles).toMatch(/\.weather__detail\s*\{[^}]*grid-template-columns:\s*1\.5rem\s+minmax\(0,\s*1fr\);/s);
   });
 
-  it("centres today's outfit content inside its full-width pill", () => {
-    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*center;[^}]*width:\s*100%;/s);
+  it("hides the quote on shorter screens only when the bins and West Ham game both need the aside", () => {
+    expect(styles).toMatch(/@media \(min-width: 901px\) and \(max-height: 900px\)\s*\{[^@]*\.today-card__aside:has\(\.bin-reminder\):has\(\.next-match\) \.morning-quote\s*\{\s*display:\s*none;/s);
   });
 
   it("makes today's weather and outfit materially larger than compact forecasts", () => {
     expect(styles).toContain("--icon-sm: 1.5rem");
     expect(styles).toContain("--icon-md: 2rem");
-    expect(styles).toContain("--icon-lg: 4.5rem");
+    expect(styles).toContain("--icon-lg: 3rem");
     expect(styles).toMatch(/\.weather\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
     expect(styles).toMatch(/\.weather--compact\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
     expect(styles).toMatch(/\.weather__reading strong\s*\{[^}]*font-size:\s*clamp\(2\.25rem,\s*2\.7vw,\s*3rem\);/s);
