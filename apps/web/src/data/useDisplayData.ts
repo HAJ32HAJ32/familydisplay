@@ -9,6 +9,15 @@ const REQUEST_TIMEOUT_MS = 10 * 1000;
 export type ReadyState = { status: "ready"; payload: DisplayPayload; receivedAt: Date; stale: boolean };
 export type DisplayDataState = { status: "loading" } | { status: "unavailable" } | ReadyState;
 
+// Snapshots saved before the forecast gained lows, rain timing and daylight
+// hours remain usable; those details are simply absent until the next poll.
+function withWeatherDetails(day: unknown): unknown {
+  if (!day || typeof day !== "object" || Array.isArray(day)) return day;
+  const weather = (day as Record<string, unknown>).weather;
+  if (!weather || typeof weather !== "object" || Array.isArray(weather)) return day;
+  return { ...day, weather: { tempMinC: null, rainFrom: null, sunrise: null, sunset: null, ...weather } };
+}
+
 function migrateCachedPayload(payload: unknown, isV1 = false): unknown {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) return payload;
   const cached = payload as Record<string, unknown>;
@@ -22,8 +31,15 @@ function migrateCachedPayload(payload: unknown, isV1 = false): unknown {
         : legacyDay;
     })
     : cached.days;
-  const migrated = { ...cached, days, ...(isV1 ? { morningQuote: null } : {}) };
-  return "nextMatch" in migrated ? migrated : { ...migrated, nextMatch: null };
+  const migrated = { ...cached, days: Array.isArray(days) ? days.map(withWeatherDetails) : days, ...(isV1 ? { morningQuote: null } : {}) };
+  return {
+    nextMatch: null,
+    calendarUpdatedAt: cached.generatedAt,
+    binReminder: null,
+    countdowns: [],
+    multiDay: [],
+    ...migrated,
+  };
 }
 
 function parseSnapshot(raw: string, legacy = false): ReadyState {
