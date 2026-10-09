@@ -179,35 +179,66 @@ function Temperatures({ max, min }: { max: number; min: number | null }) {
   );
 }
 
-function Weather({ day, compact = false, now, timezone }: { day: DisplayDay; compact?: boolean; now?: Date; timezone?: string }) {
-  if (!day.weather) return <div className="weather weather--missing">Forecast unavailable</div>;
-  const { weather } = day;
-  const rainingNow = Boolean(now && timezone && weather.rainFrom && weather.rainFrom <= clockTime(now, timezone));
-  const rainText = weather.rainFrom ? rainingNow ? "Rain now" : `Rain from ${weather.rainFrom}` : null;
-  const label = [
+function weatherLabel(day: DisplayDay, rainText: string | null) {
+  const weather = day.weather!;
+  return [
     `${fullWeekdays[day.weekday]} weather: ${conditionLabels[weather.condition]}, maximum ${weather.tempMaxC} degrees Celsius`,
     weather.tempMinC !== null ? `, minimum ${weather.tempMinC} degrees` : "",
     `, ${weather.precipitationChance}% chance of rain`,
     rainText ? `, ${rainText.toLowerCase()}` : "",
+    weather.sunrise ? `, sunrise ${weather.sunrise}` : "",
+    weather.sunset ? `, sunset ${weather.sunset}` : "",
   ].join("");
+}
+
+function Outfit({ outfit, today = false }: { outfit: NonNullable<DisplayDay["weather"]>["outfit"]; today?: boolean }) {
   return (
-    <div className={`weather${compact ? " weather--compact" : " weather--today"}`} aria-label={label}>
+    <div className={`outfit${today ? " outfit--today" : ""}`}>
+      <OutfitIcon outfit={outfit} />
+      <span>{outfitLabels[outfit]}</span>
+    </div>
+  );
+}
+
+function Weather({ day }: { day: DisplayDay }) {
+  if (!day.weather) return <div className="weather weather--missing">Forecast unavailable</div>;
+  const { weather } = day;
+  return (
+    <div className="weather weather--compact" aria-label={weatherLabel(day, null)}>
       <WeatherIcon condition={weather.condition} />
       <div className="weather__reading">
         <Temperatures max={weather.tempMaxC} min={weather.tempMinC} />
         <span className="weather__condition">{conditionLabels[weather.condition]} · {weather.precipitationChance}%</span>
       </div>
-      {!compact && (rainText || weather.sunrise || weather.sunset) && (
+      <Outfit outfit={weather.outfit} />
+    </div>
+  );
+}
+
+// Today's weather is one centred stack so every line shares the same axis.
+function TodayWeather({ day, now, timezone }: { day: DisplayDay; now: Date; timezone: string }) {
+  if (!day.weather) return <div className="weather weather--today weather--missing">Forecast unavailable</div>;
+  const { weather } = day;
+  const rainingNow = Boolean(weather.rainFrom && weather.rainFrom <= clockTime(now, timezone));
+  const rainText = weather.rainFrom ? rainingNow ? "Rain now" : `Rain from ${weather.rainFrom}` : null;
+  return (
+    <div className="weather weather--today" aria-label={weatherLabel(day, rainText)}>
+      <div className="weather__headline">
+        <WeatherIcon condition={weather.condition} />
+        <Temperatures max={weather.tempMaxC} min={weather.tempMinC} />
+      </div>
+      <span className="weather__condition">{conditionLabels[weather.condition]} · {weather.precipitationChance}%</span>
+      {(rainText || weather.sunrise || weather.sunset) && (
         <ul className="weather__details" aria-hidden="true">
           {rainText && <li className="weather__detail weather__detail--rain"><DetailIcon kind="rain" /><span>{rainText}</span></li>}
-          {weather.sunrise && <li className="weather__detail"><DetailIcon kind="sunrise" /><span>Sunrise {weather.sunrise}</span></li>}
-          {weather.sunset && <li className="weather__detail"><DetailIcon kind="sunset" /><span>Sunset {weather.sunset}</span></li>}
+          {(weather.sunrise || weather.sunset) && (
+            <li className="weather__detail weather__detail--sun">
+              {weather.sunrise && <span><DetailIcon kind="sunrise" />{weather.sunrise}</span>}
+              {weather.sunset && <span><DetailIcon kind="sunset" />{weather.sunset}</span>}
+            </li>
+          )}
         </ul>
       )}
-      <div className="outfit">
-        <OutfitIcon outfit={weather.outfit} />
-        <span>{outfitLabels[weather.outfit]}</span>
-      </div>
     </div>
   );
 }
@@ -345,7 +376,8 @@ function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
             <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span> {longDate(day.date, timezone)}
           </h2>
         </div>
-        <Weather day={day} now={now} timezone={timezone} />
+        <TodayWeather day={day} now={now} timezone={timezone} />
+        {day.weather && <Outfit outfit={day.weather.outfit} today />}
       </div>
       <div className="today-card__schedule">
         <p className="eyebrow schedule-heading">
@@ -372,7 +404,7 @@ function FutureDay({ day, timezone, events, column }: { day: DisplayDay; timezon
           <span>{day.weekday}</span>
           <strong>{datePart(day.date, timezone, "day")}</strong>
         </h2>
-        <Weather day={day} compact />
+        <Weather day={day} />
         <MealSummary meal={day.meal} />
       </div>
       <Events events={events} timezone={timezone} compact adaptive />
