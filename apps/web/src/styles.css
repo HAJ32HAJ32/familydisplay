@@ -165,7 +165,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   align-items: center;
   min-width: 0;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: clamp(var(--space-2), 0.6vw, var(--space-3));
 }
 
 .day-panel h2 {
@@ -313,9 +313,9 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: clamp(var(--space-2), 0.8vw, var(--space-4));
   width: 100%;
-  padding-top: clamp(var(--space-3), 1.1vw, var(--space-6));
+  padding-top: clamp(var(--space-4), 1.4vw, var(--space-8));
   border-top: 1px solid var(--line);
 }
 
@@ -339,8 +339,8 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   display: flex;
   align-items: center;
   flex-direction: column;
-  gap: var(--space-1);
-  margin: var(--space-2) 0 0;
+  gap: clamp(var(--space-2), 0.6vw, var(--space-3));
+  margin: clamp(var(--space-2), 0.6vw, var(--space-4)) 0 0;
   padding: 0;
   color: var(--muted);
   font-size: var(--text-label);
@@ -928,9 +928,9 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   .next-match__team strong,
   .weather--compact .weather__condition { -webkit-line-clamp: 1; }
   .rail-card { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
-  .weather--today { gap: var(--space-1); padding-top: var(--space-2); }
+  .weather--today { gap: var(--space-2); padding-top: var(--space-3); }
   .weather--today .icon--weather { width: 2.5rem; height: 2.5rem; }
-  .weather--today .weather__details { margin-top: var(--space-1); }
+  .weather--today .weather__details { gap: var(--space-2); margin-top: var(--space-1); }
   .outfit--today { padding-top: var(--space-1); padding-bottom: var(--space-1); }
   .today-card__aside:has(.next-match),
   .today-card__aside:has(.bin-reminder) { gap: var(--space-2); }
