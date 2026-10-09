@@ -360,7 +360,24 @@ function todaySchedule(payload: DisplayPayload, now: Date) {
 
 function Clock({ now, timezone }: { now: Date; timezone: string }) {
   const time = clockTime(now, timezone);
-  return <time className="today-card__clock" dateTime={now.toISOString()} aria-label={`Time ${time}`}>{time}</time>;
+  return <time className="day-panel__clock" dateTime={now.toISOString()} aria-label={`Time ${time}`}>{time}</time>;
+}
+
+// The left rail mirrors the calendar key rail: the time, date, weather and
+// what to wear, as one centred panel beside today's plan.
+function DayPanel({ day, timezone, now }: { day: DisplayDay; timezone: string; now: Date }) {
+  return (
+    <aside className="day-panel" aria-label="Time and weather">
+      <div className="day-panel__when">
+        <Clock now={now} timezone={timezone} />
+        <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
+          <span className="day-panel__weekday">{fullWeekdays[day.weekday]}</span> {longDate(day.date, timezone)}
+        </h2>
+      </div>
+      <TodayWeather day={day} now={now} timezone={timezone} />
+      {day.weather && <Outfit outfit={day.weather.outfit} today />}
+    </aside>
+  );
 }
 
 function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
@@ -369,16 +386,6 @@ function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
   const schedule = todaySchedule(payload, now);
   return (
     <section className="today-card">
-      <div className="today-card__date">
-        <div className="today-card__when">
-          <Clock now={now} timezone={timezone} />
-          <h2 aria-label={`Today · ${day.weekday} ${longDate(day.date, timezone)}`}>
-            <span className="today-card__weekday">{fullWeekdays[day.weekday]}</span> {longDate(day.date, timezone)}
-          </h2>
-        </div>
-        <TodayWeather day={day} now={now} timezone={timezone} />
-        {day.weather && <Outfit outfit={day.weather.outfit} today />}
-      </div>
       <div className="today-card__schedule">
         <p className="eyebrow schedule-heading">
           <span>Schedule for today</span>
@@ -569,6 +576,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
   return (
     <main className="display-board">
       <div className="top-row">
+        <DayPanel day={payload.days[0]!} timezone={payload.timezone} now={now} />
         <TodayCard payload={payload} now={now} />
         <div className="top-row__rail">
           <section className="rail-card">

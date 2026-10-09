@@ -1,6 +1,6 @@
 # Family Display
 
-Family Display is a shipped, read-only household kiosk. Its dominant Today panel shares the top row with a top-right rail containing the permanent calendar key, any countdowns and quiet Previous day context; six compact upcoming-day cards span the lower row. Previous day is events-only. Today and the six upcoming dates each combine calendar events, Open-Meteo conditions, a server-derived outfit suggestion and, when configured, Sous dinner data. Today also shows a live clock and, when relevant, the Tuesday bin reminder, the next West Ham game and an optional morning quote.
+Family Display is a shipped, read-only household kiosk. The top row has three zones: a left rail with the live clock, date, weather and what to wear; the Today card in the middle with the schedule, Tuesday bin reminder, dinner, next West Ham game and optional quote; and a right rail of the same width with the permanent calendar key, any countdowns and quiet Previous day context. Six compact upcoming-day cards span the lower row. Previous day is events-only. Today and the six upcoming dates each combine calendar events, Open-Meteo conditions, a server-derived outfit suggestion and, when configured, Sous dinner data. The Inter display font is bundled with the app, so the Pi does not need it installed or an internet connection to load it.
 
 Deployment status must be established from the live user service and checkout, not inferred from repository documentation or a passing branch build. The dated operator evidence and release procedure live in [`docs/deployment.md`](docs/deployment.md).
 
@@ -16,6 +16,7 @@ Deployment status must be established from the live user service and checkout, n
 - Every Tuesday, Today shows which bins go out for Wednesday’s collection. Collections alternate weekly, anchored on recycling for Wednesday 7 October 2026; change `ANCHOR_COLLECTION` in `apps/api/src/bins.ts` if the schedule moves. Bank holiday changes are not handled.
 - Add `#countdown` to any Google Calendar event title to count down to it. The rail shows the three nearest tagged events within 180 days (“Today”, “Tomorrow” or “N days”), and the tag is hidden wherever the event appears.
 - If the calendar has not updated for over an hour, or the board is still showing a previous day, a prominent warning replaces the quiet “offline” note.
+- Text wrapping: times, numbers and badges never wrap. Names (meals, team names, upcoming weather conditions) may take two lines before shortening with an ellipsis; on shorter screens (900px tall or less) they shorten after one line. Event titles always stay on one line so each list fits more events.
 - On the TV layout, the whole board shifts by a pixel or two every six minutes to reduce screen burn-in.
 - The optional shipped Sous integration supplies dated recipe, takeaway or eating-out meals. The optional shipped morning-quote integration adds a quote to Today. Either feature remains absent when it is not configured.
 
@@ -81,7 +82,7 @@ Secrets, raw calendar IDs, attendee data, descriptions, coordinates and upstream
 
 ## Known limitations
 
-- Candidate browser geometry was checked in Chromium at 1920×1080 (the TV) and 1366×768 with a busy Tuesday fixture (bin reminder, West Ham game, quote, three countdowns, three multi-day events and six Today events): board and scroll dimensions match the viewport and the Today date column, Today aside and rail fit without overflow. At 1366×768 the quote is hidden when the bin reminder and West Ham game are both showing, and Previous day may only have room for an “N events” summary when countdowns are present. That check used a fallback font because Inter was not installed.
+- Candidate browser geometry was checked in Chromium at 1920×1080 (the TV) and 1366×768 with a busy Tuesday fixture (bin reminder, West Ham game, quote, three countdowns, three multi-day events and six Today events): board and scroll dimensions match the viewport and the day panel, Today card and right rail fit without overflow. At 1366×768 the quote is hidden when the bin reminder and West Ham game are both showing, and Previous day may only have room for an “N events” summary when countdowns are present. That check used the bundled Inter font.
 - Multi-day bars rely on CSS subgrid (Chromium 117 or newer).
 - Physical Pi/TV overscan, clipping, cursor behaviour, viewing-distance readability, wake/reboot recovery, stale operation and midnight rollover remain outstanding.
 - The stale warning appears on the display only; it does not send phone notifications.
