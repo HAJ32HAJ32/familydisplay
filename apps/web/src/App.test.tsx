@@ -615,11 +615,15 @@ describe("Family Display", () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
 
-    const weather = await screen.findByLabelText("Thursday weather: Rain, maximum 19 degrees Celsius, minimum 12 degrees, 65% chance of rain, rain from 15:00");
+    const weather = await screen.findByLabelText("Thursday weather: Rain, maximum 19 degrees Celsius, minimum 12 degrees, 65% chance of rain, rain from 15:00, sunrise 06:12, sunset 19:54");
     expect(within(weather).getByText("12°")).toHaveClass("weather__low");
     expect(within(weather).getByText("Rain from 15:00")).toBeVisible();
-    expect(within(weather).getByText("Sunrise 06:12")).toBeVisible();
-    expect(within(weather).getByText("Sunset 19:54")).toBeVisible();
+    expect(within(weather).getByText("06:12")).toBeVisible();
+    expect(within(weather).getByText("19:54")).toBeVisible();
+    const outfit = weather.nextElementSibling;
+    expect(outfit).toHaveClass("outfit--today");
+    expect(outfit).toHaveTextContent("Raincoat");
+    expect(outfit?.parentElement).toHaveClass("day-panel");
     expect(screen.getByLabelText(/Friday weather: Clear, maximum 21 degrees Celsius, minimum 13 degrees/)).not.toHaveTextContent("Rain from");
   });
 
@@ -631,14 +635,19 @@ describe("Family Display", () => {
     expect(await screen.findByText("Rain now")).toBeVisible();
   });
 
-  it("puts the clock first with the date on one line beneath it", async () => {
+  it("gives time and weather their own left rail, mirroring the calendar key rail", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
 
     const heading = await screen.findByRole("heading", { name: "Today · Thu 27 August" });
     expect(heading).toHaveTextContent("Thursday 27 August");
-    expect(heading.previousElementSibling).toHaveClass("today-card__clock");
-    expect(heading.closest(".today-card__when")?.nextElementSibling).toHaveClass("weather--today");
+    expect(heading.previousElementSibling).toHaveClass("day-panel__clock");
+    expect(heading.closest(".day-panel__when")?.nextElementSibling).toHaveClass("weather--today");
+    const panel = screen.getByLabelText("Time and weather");
+    expect(panel.parentElement).toHaveClass("top-row");
+    expect(panel.nextElementSibling).toHaveClass("today-card");
+    expect(panel.parentElement?.lastElementChild).toHaveClass("top-row__rail");
+    expect(screen.getByText("Schedule for today").closest(".today-card")?.querySelector(".day-panel")).toBeNull();
   });
 
   it("keeps the West Ham game alongside the bin reminder", async () => {

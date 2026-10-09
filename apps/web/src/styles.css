@@ -1,6 +1,6 @@
 :root {
   color-scheme: dark;
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter Variable", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
 
   /* Four-point spacing system */
@@ -87,9 +87,13 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   overflow: hidden;
 }
 
+/* Three zones: now (time and weather) on the left, today's plan in the
+   middle and context (key, countdowns, yesterday) on the right. The two
+   rails always share one width so the board stays symmetrical. */
 .top-row {
+  --rail-width: minmax(17rem, 0.26fr);
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.28fr);
+  grid-template-columns: var(--rail-width) minmax(0, 1fr) var(--rail-width);
   gap: var(--space-4);
   min-height: 0;
 }
@@ -116,13 +120,12 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 .today-card {
   display: grid;
-  grid-template-columns: minmax(9rem, 0.9fr) minmax(18rem, 1.7fr) minmax(15rem, 1.1fr);
-  gap: var(--space-6);
+  grid-template-columns: minmax(18rem, 1.55fr) minmax(15rem, 1fr);
+  gap: clamp(var(--space-6), 2.4vw, var(--space-12));
   padding: clamp(var(--space-4), 1.6vw, var(--space-8));
   box-shadow: 0 var(--space-4) var(--space-8) rgba(0, 0, 0, 0.2);
 }
 
-.today-card__date,
 .today-card__schedule,
 .today-card__aside {
   min-width: 0;
@@ -132,44 +135,59 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: clamp(var(--space-3), 1vw, var(--space-4));
 }
 
-/* Clock first: every row of the date column shares one left edge, with a
-   hairline between the time and the weather. */
-.today-card__date {
+/* The day panel mirrors the right-hand rail card. Every line is centred on
+   one axis with fixed gaps, and the outfit pill always spans the panel's
+   full width at its foot. */
+.day-panel {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   flex-direction: column;
-  justify-content: flex-start;
-  gap: var(--space-4);
+  gap: clamp(var(--space-3), 1.1vw, var(--space-6));
+  min-width: 0;
   min-height: 0;
-  text-align: left;
+  padding: clamp(var(--space-4), 1.4vw, var(--space-6));
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(17, 27, 45, 0.92);
+  text-align: center;
 }
 
-.today-card__when {
+/* The time and weather group sits centred in the space above the pill. */
+.day-panel__when { margin-top: auto; }
+.day-panel .weather--today { margin-bottom: auto; }
+
+.day-panel__when {
   display: flex;
+  align-items: center;
   min-width: 0;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: clamp(var(--space-2), 0.6vw, var(--space-3));
 }
 
-.today-card__date h2 {
+.day-panel h2 {
+  overflow: hidden;
+  max-width: 100%;
   margin: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: var(--text-body);
   font-weight: 500;
   line-height: 1.25;
 }
 
-.today-card__weekday {
+.day-panel__weekday {
   color: var(--accent);
   font-weight: 650;
 }
 
-.today-card__clock {
+.day-panel__clock {
   color: var(--text);
-  font-size: clamp(3rem, 4.6vw, 4.75rem);
+  font-size: clamp(3rem, 4.4vw, 5.25rem);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   letter-spacing: -0.03em;
@@ -259,6 +277,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   flex-direction: column;
 }
 
+.weather__headline strong,
 .weather__reading strong {
   color: var(--text);
   font-size: clamp(2.25rem, 2.7vw, 3rem);
@@ -291,71 +310,80 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 
 .weather--today {
-  flex: 1 1 auto;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  align-content: start;
-  row-gap: var(--space-4);
-  min-height: 0;
-  padding-top: var(--space-4);
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: clamp(var(--space-2), 0.8vw, var(--space-4));
+  width: 100%;
+  padding-top: clamp(var(--space-4), 1.4vw, var(--space-8));
   border-top: 1px solid var(--line);
 }
 
+.weather__headline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.weather--today .weather__condition { max-width: 100%; margin-top: 0; }
+.weather--compact .weather__condition {
+  display: -webkit-box;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .weather--today .weather__low::before { content: "/ "; }
 
 .weather__details {
-  grid-column: 1 / -1;
   display: flex;
+  align-items: center;
   flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
+  gap: clamp(var(--space-2), 0.6vw, var(--space-3));
+  margin: clamp(var(--space-2), 0.6vw, var(--space-4)) 0 0;
   padding: 0;
   color: var(--muted);
   font-size: var(--text-label);
   list-style: none;
 }
 
-.weather__detail {
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr);
+.weather__detail,
+.weather__detail span {
+  display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
   white-space: nowrap;
 }
 
+.weather__detail--sun { gap: var(--space-4); }
 .weather__detail--rain { color: var(--text); font-weight: 650; }
 
 .outfit {
-  grid-column: 1 / -1;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
-  justify-content: flex-start;
-  justify-self: start;
-  width: fit-content;
-  max-width: 100%;
-  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-3);
-  border: 0;
-  border-radius: 999px;
+  min-width: 0;
   color: var(--accent);
+}
+
+.outfit--today {
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
   background: rgba(66, 200, 245, 0.16);
 }
 
-.outfit span { font-size: var(--text-body); font-weight: 700; }
-
-.weather--today .outfit { grid-row: -2 / -1; align-self: end; }
+.outfit--today span { font-size: var(--text-body); font-weight: 700; }
 
 .weather--compact .outfit {
   grid-column: 1 / -1;
   justify-content: flex-start;
   width: fit-content;
   padding: var(--space-1) 0;
-  border: 0;
   color: var(--muted);
-  background: transparent;
   font-size: var(--text-label);
 }
-
-.weather--compact .outfit span { font-size: inherit; font-weight: inherit; }
 
 .icon {
   width: var(--icon-md);
@@ -367,7 +395,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 .icon--outfit, .icon--meal { width: var(--icon-sm); height: var(--icon-sm); }
 .icon--detail { width: 1.25rem; height: 1.25rem; color: var(--accent); }
 .icon--bin { width: var(--icon-md); height: var(--icon-md); }
-.outfit .icon--outfit { width: var(--icon-md); height: var(--icon-md); }
+.outfit--today .icon--outfit { width: var(--icon-md); height: var(--icon-md); }
 .weather--compact .icon--outfit { width: var(--icon-sm); height: var(--icon-sm); }
 
 .event-list {
@@ -535,13 +563,18 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 .meal > div { min-width: 0; }
 .meal .eyebrow { margin-bottom: var(--space-1); color: var(--accent); }
+/* Wrapping rules: times, numbers and badges never wrap. Names (meals, team
+   names, weather conditions) may take two lines before shortening with an
+   ellipsis. Event titles stay on one line so each list fits more events. */
 .meal strong,
 .meal__value {
-  display: block;
+  display: -webkit-box;
   overflow: hidden;
   font-size: var(--text-title);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 .meal--empty { color: var(--subtle); }
 .meal--empty .eyebrow { color: var(--muted); }
@@ -575,14 +608,21 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   height: 2.5rem;
   object-fit: contain;
 }
-.next-match__team strong,
 .next-match__competition {
   overflow: hidden;
   max-width: 100%;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.next-match__team strong { font-size: clamp(0.75rem, 0.9vw, 1rem); }
+.next-match__team strong {
+  display: -webkit-box;
+  overflow: hidden;
+  max-width: 100%;
+  font-size: clamp(0.75rem, 0.9vw, 1rem);
+  line-height: 1.15;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .next-match__kickoff,
 .next-match__kickoff time {
   display: flex;
@@ -635,7 +675,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   -webkit-line-clamp: 2;
 }
 
-.today-card__aside:has(.next-match) { gap: var(--space-2); }
+.today-card__aside:has(.next-match) { gap: var(--space-3); }
 .today-card__aside:has(.next-match) .morning-quote {
   flex: 1 1 0;
   padding: var(--space-3);
@@ -653,7 +693,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 
 /* The Tuesday bin reminder takes the same room as the match card. */
-.today-card__aside:has(.bin-reminder) { gap: var(--space-2); }
+.today-card__aside:has(.bin-reminder) { gap: var(--space-3); }
 .today-card__aside:has(.bin-reminder) .morning-quote {
   flex: 1 1 0;
   padding: var(--space-3);
@@ -742,7 +782,12 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 .future-day__summary .meal { grid-column: 1 / -1; padding-top: var(--space-2); border-top: 1px solid var(--line); }
 .future-day__summary .meal .eyebrow { display: none; }
 .future-day__summary .meal strong,
-.future-day__summary .meal__value { font-size: var(--text-small); }
+.future-day__summary .meal__value {
+  display: block;
+  font-size: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .rail-card {
   display: flex;
@@ -875,16 +920,26 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
    When the bin reminder and the West Ham game both need the aside, the
    quote steps aside so neither is squeezed. */
 @media (min-width: 901px) and (max-height: 900px) {
-  .today-card__date { gap: var(--space-3); }
-  .weather--today { row-gap: var(--space-3); padding-top: var(--space-3); }
-  .weather--today .weather__details { gap: var(--space-1); }
-  .weather--today .outfit { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .day-panel { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+  .day-panel h2 { font-size: var(--text-small); }
+  /* Too little height for two-line names: they shorten after one line. */
+  .meal strong,
+  .meal__value,
+  .next-match__team strong,
+  .weather--compact .weather__condition { -webkit-line-clamp: 1; }
+  .rail-card { gap: var(--space-2); padding: var(--space-3) var(--space-4); }
+  .weather--today { gap: var(--space-2); padding-top: var(--space-3); }
+  .weather--today .icon--weather { width: 2.5rem; height: 2.5rem; }
+  .weather--today .weather__details { gap: var(--space-2); margin-top: var(--space-1); }
+  .outfit--today { padding-top: var(--space-1); padding-bottom: var(--space-1); }
+  .today-card__aside:has(.next-match),
+  .today-card__aside:has(.bin-reminder) { gap: var(--space-2); }
   .today-card__aside:has(.bin-reminder):has(.next-match) .morning-quote { display: none; }
 }
 
 @media (max-width: 1100px) and (min-width: 901px) {
-  .today-card { grid-template-columns: minmax(8rem, 0.75fr) minmax(16rem, 1.7fr) minmax(13rem, 1fr); }
-  .top-row { grid-template-columns: minmax(0, 1fr) 17rem; }
+  .today-card { grid-template-columns: minmax(14rem, 1.5fr) minmax(12rem, 1fr); }
+  .top-row { --rail-width: 15rem; }
   .future-grid { gap: var(--space-2); }
   .future-day__summary { padding: var(--space-2); }
 }
@@ -900,9 +955,11 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   }
   .top-row { display: block; }
   .today-card { grid-template-columns: 1fr; margin-bottom: var(--space-4); }
-  .today-card__date { gap: var(--space-6); }
+  .day-panel { gap: var(--space-6); margin-bottom: var(--space-4); }
   .today-card__schedule .event-list--adaptive,
-  .today-card__aside .morning-quote { flex: 0 0 auto; }
+  .today-card__aside .morning-quote,
+  .today-card__aside:has(.next-match) .morning-quote,
+  .today-card__aside:has(.bin-reminder) .morning-quote { flex: 0 0 auto; }
   .top-row__rail { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-bottom: var(--space-4); }
   .future-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .future-day { overflow: visible; }

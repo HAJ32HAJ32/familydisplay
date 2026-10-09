@@ -64,7 +64,7 @@ describe("visual system", () => {
   });
 
   it("makes today's clock bold with steady digits", () => {
-    expect(styles).toMatch(/\.today-card__clock\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
+    expect(styles).toMatch(/\.day-panel__clock\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
   });
 
   it("only nudges the board for burn-in protection on the wide TV layout", () => {
@@ -114,7 +114,7 @@ describe("visual system", () => {
   });
 
   it("compacts the quote only when the match card is present so the Today aside stays bounded", () => {
-    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\)\s*\{[^}]*gap:\s*var\(--space-2\);/s);
+    expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\)\s*\{[^}]*gap:\s*var\(--space-3\);/s);
     expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote\s*\{[^}]*flex:\s*1\s+1\s+0;[^}]*padding:\s*var\(--space-3\);[^}]*overflow:\s*hidden;/s);
     expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote p\s*\{[^}]*font-size:\s*var\(--text-small\);[^}]*line-height:\s*1\.25;[^}]*-webkit-line-clamp:\s*2;/s);
     expect(styles).toMatch(/\.today-card__aside:has\(\.next-match\) \.morning-quote cite\s*\{[^}]*font-size:\s*clamp\(0\.8rem,\s*0\.9vw,\s*1rem\);[^}]*-webkit-line-clamp:\s*1;/s);
@@ -129,18 +129,33 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.morning-quote cite\s*\{[^}]*display:\s*-webkit-box;[^}]*overflow:\s*hidden;[^}]*overflow-wrap:\s*anywhere;[^}]*-webkit-box-orient:\s*vertical;[^}]*-webkit-line-clamp:\s*2;/s);
   });
 
-  it("left-aligns today's date and weather content with the outfit as a left-aligned chip", () => {
-    expect(styles).toMatch(/\.today-card__date\s*\{[^}]*align-items:\s*stretch;[^}]*text-align:\s*left;/s);
-    expect(styles).toMatch(/\.weather\s*\{[^}]*width:\s*100%;[^}]*text-align:\s*left;/s);
-    expect(styles).not.toMatch(/\.weather\s*\{[^}]*justify-items:\s*start;/s);
-    expect(styles).toMatch(/\.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-self:\s*start;[^}]*width:\s*fit-content;/s);
+  it("contains today's date and weather in one centred panel with a full-width outfit pill at its foot", () => {
+    expect(styles).toMatch(/\.day-panel\s*\{[^}]*align-items:\s*center;[^}]*flex-direction:\s*column;[^}]*border:\s*1px solid var\(--line\);[^}]*border-radius:\s*var\(--radius-lg\);[^}]*text-align:\s*center;/s);
+    expect(styles).toMatch(/\.weather--today\s*\{[^}]*align-items:\s*center;[^}]*width:\s*100%;[^}]*border-top:\s*1px solid var\(--line\);/s);
+    expect(styles).toMatch(/\.outfit--today\s*\{[^}]*justify-content:\s*center;[^}]*width:\s*100%;/s);
+    expect(styles).toMatch(/\.day-panel__when\s*\{\s*margin-top:\s*auto;\s*\}/s);
+    expect(styles).toMatch(/\.day-panel \.weather--today\s*\{\s*margin-bottom:\s*auto;\s*\}/s);
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;[^}]*justify-content:\s*flex-start;[^}]*width:\s*fit-content;/s);
   });
 
-  it("separates today's time from its weather with a hairline and anchors the outfit chip to the bottom", () => {
-    expect(styles).toMatch(/\.weather--today\s*\{[^}]*grid-template-rows:\s*auto\s+auto\s+minmax\(0,\s*1fr\);[^}]*padding-top:\s*var\(--space-4\);[^}]*border-top:\s*1px solid var\(--line\);/s);
-    expect(styles).toMatch(/\.weather--today \.outfit\s*\{\s*grid-row:\s*-2\s*\/\s*-1;\s*align-self:\s*end;/s);
-    expect(styles).toMatch(/\.weather__detail\s*\{[^}]*grid-template-columns:\s*1\.5rem\s+minmax\(0,\s*1fr\);/s);
+  it("mirrors the day panel and the right-hand rail at one shared width either side of Today", () => {
+    expect(styles).toMatch(/\.top-row\s*\{[^}]*--rail-width:\s*minmax\(17rem,\s*0\.26fr\);[^}]*grid-template-columns:\s*var\(--rail-width\)\s+minmax\(0,\s*1fr\)\s+var\(--rail-width\);/s);
+  });
+
+  it("bundles the Inter display font ahead of system fallbacks", () => {
+    expect(styles).toMatch(/font-family:\s*"Inter Variable",\s*Inter,/);
+  });
+
+  it("lets names wrap to two lines on the TV and shortens them after one line on shorter screens", () => {
+    expect(styles).toMatch(/\.meal strong,\s*\.meal__value\s*\{[^}]*-webkit-line-clamp:\s*2;/s);
+    expect(styles).toMatch(/\.next-match__team strong\s*\{[^}]*-webkit-line-clamp:\s*2;/s);
+    expect(styles).toMatch(/\.weather--compact \.weather__condition\s*\{[^}]*-webkit-line-clamp:\s*2;/s);
+    expect(styles).toMatch(/@media \(min-width: 901px\) and \(max-height: 900px\)\s*\{[^@]*\.meal strong,\s*\.meal__value,\s*\.next-match__team strong,\s*\.weather--compact \.weather__condition\s*\{\s*-webkit-line-clamp:\s*1;/s);
+  });
+
+  it("gives the Today columns and aside cards room to breathe", () => {
+    expect(styles).toMatch(/\.today-card\s*\{[^}]*gap:\s*clamp\(var\(--space-6\),\s*2\.4vw,\s*var\(--space-12\)\);/s);
+    expect(styles).toMatch(/\.today-card__aside\s*\{[^}]*gap:\s*clamp\(var\(--space-3\),\s*1vw,\s*var\(--space-4\)\);/s);
   });
 
   it("hides the quote on shorter screens only when the bins and West Ham game both need the aside", () => {
@@ -157,8 +172,8 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.weather--compact \.weather__reading strong\s*\{[^}]*font-size:\s*var\(--text-body\);/s);
     expect(styles).toMatch(/\.icon--weather\s*\{[^}]*width:\s*var\(--icon-lg\);[^}]*height:\s*var\(--icon-lg\);/s);
     expect(styles).toMatch(/\.weather--compact \.icon--weather\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
-    expect(styles).toMatch(/\.outfit \.icon--outfit\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
-    expect(styles).toMatch(/\.outfit span\s*\{[^}]*font-size:\s*var\(--text-body\);[^}]*font-weight:\s*700;/s);
+    expect(styles).toMatch(/\.outfit--today \.icon--outfit\s*\{[^}]*width:\s*var\(--icon-md\);[^}]*height:\s*var\(--icon-md\);/s);
+    expect(styles).toMatch(/\.outfit--today span\s*\{[^}]*font-size:\s*var\(--text-body\);[^}]*font-weight:\s*700;/s);
     expect(styles).toMatch(/\.weather--compact \.outfit\s*\{[^}]*font-size:\s*var\(--text-label\);/s);
   });
 

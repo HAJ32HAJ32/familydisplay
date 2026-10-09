@@ -102,7 +102,7 @@ components:
 
 ## Overview
 
-Family Display is a dark, stable television dashboard designed for a five-second glance. The main desktop composition is a dominant Today card, a top-right rail containing the permanent calendar key and countdowns above Previous day, and six equal upcoming-day cards across the lower row. Previous day is events-only. Today and the six upcoming dates own their weather, outfit, events and optional dinner. The live clock, Tuesday bin reminder and optional morning quote sit inside Today rather than becoming more panels.
+Family Display is a dark, stable television dashboard designed for a five-second glance. The main desktop composition has three zones across the top row: a left day panel (now), the Today card (today's plan) and a right rail (context), with six equal upcoming-day cards across the lower row. The two rails always share one width so the board stays symmetrical. Previous day is events-only. Today and the six upcoming dates own their weather, outfit, events and optional dinner. Inter is bundled with the app (`@fontsource-variable/inter`) so the TV renders the intended type without a network connection.
 
 This design records the implemented hierarchy and compact-event behaviour. Deployment identity is established from the live checkout and user service, not from this document.
 
@@ -114,18 +114,21 @@ The six event colours preserve the Google Calendar mapping while using tuned chr
 
 Use the exact five responsive type tokens in the frontmatter. They reduce the enlarged baseline by roughly 10–15% while preserving a distance-readable scale. Exceptional strings truncate predictably rather than forcing the general scale down.
 
-Today's date column is laid out clock first: a bold `clamp(3rem, 4.6vw, 4.75rem)` clock, then the weekday (accent) and date on one body-sized line, then a hairline. Below it, every weather row shares the same left edge: the 48px large weather icon beside the `clamp(2.25rem, 2.7vw, 3rem)` high and a muted "/ low", the condition line, a label-sized list of rain timing, sunrise and sunset with a fixed icon column, and the outfit as a left-aligned tinted chip anchored to the bottom (body text at weight 700 with a 32px icon). Compact cards use label-sized weather/outfit copy, body-sized temperature, a 32px weather icon and a 24px outfit icon.
+The left day panel uses the same border, radius and tint as the right rail card. Every line is centred on one axis with fixed gaps, and the time and weather group is centred vertically in the space above the outfit pill: a bold `clamp(3rem, 4.4vw, 5.25rem)` clock, the weekday (accent) and date on one line, a hairline, the 48px weather icon beside the `clamp(2.25rem, 2.7vw, 3rem)` high and a muted "/ low", the condition line, then a label-sized line for rain timing and one for sunrise and sunset. The outfit pill always spans the panel's full width at its foot (body text at weight 700 with a 32px icon), so it never shifts with the length of its label. Inside the Today card, the schedule and aside use a `clamp(1.5rem, 2.4vw, 3rem)` gap and the aside cards a `clamp(0.75rem, 1vw, 1rem)` gap.
+
+Wrapping: times, numbers and badges never wrap. Names (meals, team names, upcoming weather conditions) may take two lines before shortening with an ellipsis, and shorten after one line on screens 900px tall or less. Event titles always stay on one line so each list fits more events. Compact cards use label-sized weather/outfit copy, body-sized temperature, a 32px weather icon and a 24px outfit icon.
 
 ## Layout
 
-All spacing comes from the four-point scale. Above 900px, the board is locked to the viewport and uses `minmax(0, 1.15fr) minmax(0, 1fr)` rows. The permanent calendar key, freshness and countdowns share one card at the top of the right rail, above Previous day. Upcoming cards share a subgrid so their summaries align and multi-day bars can span several cards. The board shifts by up to two pixels every six minutes to reduce burn-in. At 900px and below, sections enter document flow, stack progressively and may scroll for development access.
+All spacing comes from the four-point scale. Above 900px, the board is locked to the viewport and uses `minmax(0, 1.15fr) minmax(0, 1fr)` rows. The top row's columns are `var(--rail-width) minmax(0, 1fr) var(--rail-width)` with `--rail-width: minmax(17rem, 0.26fr)`. The permanent calendar key, freshness and countdowns share one card at the top of the right rail, above Previous day. Upcoming cards share a subgrid so their summaries align and multi-day bars can span several cards. The board shifts by up to two pixels every six minutes to reduce burn-in. At 900px and below, sections enter document flow, stack progressively and may scroll for development access.
 
 The TV runs at 1920×1080; 1366×768 is the smallest supported desktop size. In Chromium verification with a busy Tuesday fixture (bin reminder, West Ham game, quote, countdowns and multi-day events), board and scroll dimensions matched each viewport exactly and the Today columns and rail fitted without overflow. Below 900px of height, the date column's spacing tightens and, when the bin reminder and West Ham game are both showing, the quote is hidden. Physical Pi/TV acceptance remains a separate outstanding gate.
 
 ## Components
 
-- **Today:** live clock first, then weekday and date; Open-Meteo condition with high and low temperature, rain timing, sunrise and sunset; prominent outfit guidance; the schedule with a “N done” count and Now/Next markers; the Tuesday bin reminder; optional Sous dinner, next West Ham game and morning quote.
-- **Top-right rail:** one card holding the permanent six-group Calendar key, freshness state and up to three `#countdown` events, above quiet Previous day content.
+- **Day panel (left rail):** live clock first, then weekday and date; Open-Meteo condition with high and low temperature, rain timing, sunrise and sunset; a full-width outfit pill at its foot.
+- **Today:** the schedule with a “N done” count and Now/Next markers; the Tuesday bin reminder; optional Sous dinner, next West Ham game and morning quote.
+- **Right rail:** one card holding the permanent six-group Calendar key, freshness state and up to three `#countdown` events, above quiet Previous day content.
 - **Upcoming days:** six compact cards with date, weather/outfit (high and low), dinner and events, with multi-day bars spanning the cards between the summaries and event lists.
 - **Event overflow:** each list renders every event that fits its measured space; the rest become a deterministic `+N more` row, or an “N events” summary when none fit.
 - **All-day event:** Today shows the words “All day” (or “Until Sat” for a multi-day event). A compact all-day event shows no time marker; its title and group badge share one grid row and the accessible label says “All day”. Timed compact events retain the two-row treatment.
