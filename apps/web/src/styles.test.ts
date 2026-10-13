@@ -230,3 +230,12 @@ describe("visual system", () => {
     expect(styles).toMatch(new RegExp(`\\.event--${group}\\s*\\{[^}]*background:\\s*${token.replace(/[()]/g, "\\$&")};`, "s"));
   });
 });
+
+describe("stale warning placement", () => {
+  it("reserves its own bottom row instead of floating over today's schedule", () => {
+    const rule = styles.match(/\.stale-alert\s*\{[^}]*\}/s)![0];
+    expect(rule).not.toMatch(/position:\s*(absolute|fixed)/);
+    expect(rule).not.toMatch(/top:/);
+    expect(styles).toMatch(/\.display-board--alert\s*\{[^}]*grid-template-rows:\s*minmax\(min-content,\s*1\.15fr\)\s+minmax\(0,\s*1fr\)\s+auto;/s);
+  });
+});

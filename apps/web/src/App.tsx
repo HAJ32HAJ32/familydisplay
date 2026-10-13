@@ -490,11 +490,15 @@ function Freshness({ payload, stale }: { payload: DisplayPayload; stale: boolean
   return <p className={`freshness${stale ? " freshness--stale" : ""}`}>{stale ? `Last updated ${time} · offline` : `Updated ${time}`}</p>;
 }
 
-function StaleAlert({ payload, now }: { payload: DisplayPayload; now: Date }) {
+function needsStaleAlert(payload: DisplayPayload, now: Date) {
   const updatedAt = new Date(payload.calendarUpdatedAt);
   const outOfDate = now.getTime() - updatedAt.getTime() > STALE_ALERT_MS;
   const wrongDay = payload.days[0]!.date !== localDate(now, payload.timezone);
-  if (!outOfDate && !wrongDay) return null;
+  return outOfDate || wrongDay;
+}
+
+function StaleAlert({ payload, now }: { payload: DisplayPayload; now: Date }) {
+  const updatedAt = new Date(payload.calendarUpdatedAt);
   const time = clockTime(updatedAt, payload.timezone);
   const day = new Intl.DateTimeFormat("en-GB", { weekday: "long", timeZone: payload.timezone }).format(updatedAt);
   const sameDay = localDate(updatedAt, payload.timezone) === localDate(now, payload.timezone);
@@ -573,8 +577,9 @@ function YesterdayPanel({ payload }: { payload: DisplayPayload }) {
 function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
   const now = useNow();
   const wide = useWideLayout();
+  const alert = needsStaleAlert(payload, now);
   return (
-    <main className="display-board">
+    <main className={`display-board${alert ? " display-board--alert" : ""}`}>
       <div className="top-row">
         <DayPanel day={payload.days[0]!} timezone={payload.timezone} now={now} />
         <TodayCard payload={payload} now={now} />
@@ -587,7 +592,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
         </div>
       </div>
       <FutureGrid payload={payload} wide={wide} />
-      <StaleAlert payload={payload} now={now} />
+      {alert && <StaleAlert payload={payload} now={now} />}
     </main>
   );
 }

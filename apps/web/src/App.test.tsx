@@ -767,6 +767,17 @@ describe("Family Display", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Not updated since 18:42");
   });
 
+  it("places the stale warning at the bottom of the board, after the schedule", async () => {
+    vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-08-27T20:00:00+01:00") });
+    vi.mocked(fetch).mockResolvedValueOnce(response({ ...payload, calendarUpdatedAt: "2026-08-27T18:42:00+01:00" }));
+    const { container } = render(<App />);
+
+    const alert = await screen.findByRole("alert");
+    const board = container.querySelector(".display-board")!;
+    expect(board).toHaveClass("display-board--alert");
+    expect(board.lastElementChild).toBe(alert);
+  });
+
   it("stays calm while the calendar is less than an hour old", async () => {
     vi.useFakeTimers({ toFake: ["Date"], now: new Date("2026-08-27T19:41:00+01:00") });
     vi.mocked(fetch).mockResolvedValueOnce(response(payload, true));

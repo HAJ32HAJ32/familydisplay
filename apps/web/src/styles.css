@@ -879,27 +879,28 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 }
 .freshness--stale { color: var(--warning); }
 
+/* The stale warning takes its own bottom row so it never covers the
+   schedule. Today's row keeps at least its content height; the upcoming
+   days give up the space and fold extra events into "+N more". */
+.display-board--alert {
+  grid-template-rows: minmax(min-content, 1.15fr) minmax(0, 1fr) auto;
+}
+
 .stale-alert {
-  position: absolute;
-  z-index: 5;
-  top: var(--space-6);
-  left: 50%;
   display: flex;
-  max-width: calc(100% - var(--space-12));
   align-items: center;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-3) var(--space-6);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-1) var(--space-4);
   border: 2px solid var(--warning);
   border-radius: var(--radius-md);
   color: var(--text);
   background: #2a1d0b;
-  box-shadow: 0 var(--space-4) var(--space-8) rgba(0, 0, 0, 0.45);
   text-align: center;
-  transform: translateX(-50%);
 }
-.stale-alert strong { color: var(--warning); font-size: var(--text-title); }
-.stale-alert span { font-size: var(--text-body); }
+.stale-alert strong { color: var(--warning); font-size: var(--text-body); }
+.stale-alert span { font-size: var(--text-label); }
 
 /* Nudges the whole board by a pixel or two every six minutes so static
    edges do not burn into the television. */
