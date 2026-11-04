@@ -164,6 +164,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   display: flex;
   align-items: center;
   min-width: 0;
+  max-width: 100%;
   flex-direction: column;
   gap: clamp(var(--space-2), 0.6vw, var(--space-3));
 }
@@ -173,7 +174,8 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
   max-width: 100%;
   margin: 0;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  text-wrap: balance;
   color: var(--muted);
   font-size: var(--text-body);
   font-weight: 500;
@@ -914,7 +916,7 @@ body:not([data-show-cursor="true"]) * { cursor: none; }
 
 @media (min-width: 901px) {
   .app-shell:has(.display-board) { height: 100vh; overflow: hidden; }
-  .display-board { animation: burn-in-shift 30m step-end infinite; }
+  .display-board { animation: burn-in-shift 1800s step-end infinite; }
 }
 
 /* Shorter TV layouts (such as 1366×768) tighten the date column's rhythm.
