@@ -67,9 +67,35 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.day-panel__clock\s*\{[^}]*font-variant-numeric:\s*tabular-nums;[^}]*font-weight:\s*(?:7\d\d|8\d\d|9\d\d);/s);
   });
 
+  it("keeps a long weekday and month inside the date panel without clipping the date", () => {
+    const when = styles.match(/\.day-panel__when\s*\{[^}]*flex-direction:\s*column;[^}]*\}/s)?.[0] ?? "";
+    expect(when, "the clock/date wrapper must respect its rail's content width").toMatch(/max-width:\s*100%;/);
+    const heading = styles.match(/\.day-panel h2\s*\{[^}]*\}/s)?.[0] ?? "";
+    expect(heading, "long dates must wrap rather than consume the rail padding").toMatch(/white-space:\s*normal;/);
+    expect(heading).toMatch(/text-wrap:\s*balance;/);
+  });
+
   it("only nudges the board for burn-in protection on the wide TV layout", () => {
     expect(styles).toMatch(/@keyframes burn-in-shift/);
-    expect(styles).toMatch(/@media \(min-width: 901px\)\s*\{[^@]*\.display-board\s*\{\s*animation:\s*burn-in-shift 30m step-end infinite;/s);
+    expect(styles).toMatch(/@media \(min-width: 901px\)\s*\{[^@]*\.display-board\s*\{\s*animation:\s*burn-in-shift 1800s step-end infinite;/s);
+  });
+
+  it("gives the burn-in animation a valid CSS time so the browser can run it", () => {
+    // This assertion is deliberately scoped to the burn-in duration; numeric
+    // easing parameters and iteration counts are not CSS time values.
+    const declaration = styles.match(/animation:\s*burn-in-shift\s+([^\s;]+)/);
+    expect(declaration, "missing burn-in animation declaration").not.toBeNull();
+    expect(declaration?.[1]).toMatch(/^\d+(?:\.\d+)?(?:s|ms)$/);
+  });
+
+  it("steps the burn-in shift every six minutes across a thirty-minute cycle", () => {
+    const match = styles.match(/@keyframes burn-in-shift\s*\{([\s\S]*?)\n\}/);
+    expect(match, "missing burn-in keyframes block").not.toBeNull();
+    const keyframes = match?.[1] ?? "";
+    const stops = [...keyframes.matchAll(/(\d+)%/g)].map((match) => Number(match[1]));
+    expect(stops).toEqual([0, 20, 40, 60, 80]);
+    const seconds = Number(styles.match(/animation:\s*burn-in-shift (\d+)s step-end infinite;/)?.[1]);
+    expect(seconds * 0.2).toBe(6 * 60);
   });
 
   it("lines multi-day bars up with the upcoming cards using a shared grid", () => {
