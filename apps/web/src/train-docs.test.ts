@@ -18,4 +18,11 @@ describe("train rotation operating contract", () => {
     expect(deployment).toContain("requires no local API credentials");
     expect(deployment).toContain("/api/trains");
   });
+
+  it("describes train check time and current short-screen geometry without claiming upstream timestamps", () => {
+    expect(deployment).toContain("Checked time is the local completion time");
+    expect(deployment).toContain("does not expose a guaranteed upstream observation timestamp");
+    expect(deployment).toContain("2.4:1 top-to-bottom row ratio");
+    expect(deployment).not.toContain("desktop rows of 416px and 288px");
+  });
 });
