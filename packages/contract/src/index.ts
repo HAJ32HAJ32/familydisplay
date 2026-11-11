@@ -92,6 +92,52 @@ export const displayDaySchema = z.strictObject({
 });
 const sevenDaysSchema = z.tuple([displayDaySchema, displayDaySchema, displayDaySchema, displayDaySchema, displayDaySchema, displayDaySchema, displayDaySchema]);
 
+const trainDepartureSchema = z.discriminatedUnion("status", [
+  z.strictObject({
+    destination: z.string().trim().min(1).max(100),
+    scheduledTime: clockTimeSchema,
+    expectedTime: z.null(),
+    status: z.literal("on-time"),
+  }),
+  z.strictObject({
+    destination: z.string().trim().min(1).max(100),
+    scheduledTime: clockTimeSchema,
+    expectedTime: clockTimeSchema,
+    status: z.literal("delayed"),
+  }),
+  z.strictObject({
+    destination: z.string().trim().min(1).max(100),
+    scheduledTime: clockTimeSchema,
+    expectedTime: z.null(),
+    status: z.literal("cancelled"),
+  }),
+]);
+
+const stationIdentitySchema = z.discriminatedUnion("crs", [
+  z.strictObject({ crs: z.literal("UWL"), station: z.literal("Upper Warlingham") }),
+  z.strictObject({ crs: z.literal("CDS"), station: z.literal("Coulsdon South") }),
+  z.strictObject({ crs: z.literal("WHY"), station: z.literal("Whyteleafe") }),
+]);
+
+const trainStationBoardSchema = z.intersection(
+  stationIdentitySchema,
+  z.discriminatedUnion("state", [
+    z.strictObject({ state: z.literal("available"), checkedAt: timestampSchema, departures: z.array(trainDepartureSchema).min(1).max(3) }),
+    z.strictObject({ state: z.literal("empty"), checkedAt: timestampSchema, departures: z.tuple([]) }),
+    z.strictObject({ state: z.literal("unavailable"), checkedAt: timestampSchema, departures: z.tuple([]) }),
+  ])
+);
+
+export const trainPayloadSchema = z.strictObject({
+  generatedAt: timestampSchema,
+  source: z.strictObject({ name: z.literal("railinfo"), attribution: z.literal("railinfo.uk · Network Rail & National Rail") }),
+  main: trainStationBoardSchema.refine((board) => board.crs === "UWL", "Main station must be Upper Warlingham"),
+  rotating: z.tuple([
+    trainStationBoardSchema.refine((board) => board.crs === "CDS", "First rotating station must be Coulsdon South"),
+    trainStationBoardSchema.refine((board) => board.crs === "WHY", "Second rotating station must be Whyteleafe"),
+  ]),
+});
+
 export const displayPayloadSchema = z.strictObject({
   generatedAt: timestampSchema,
   calendarUpdatedAt: timestampSchema,
@@ -128,3 +174,6 @@ export type Countdown = z.infer<typeof countdownSchema>;
 export type BinReminder = z.infer<typeof binReminderSchema>;
 export type DisplayDay = z.infer<typeof displayDaySchema>;
 export type DisplayPayload = z.infer<typeof displayPayloadSchema>;
+export type TrainDeparture = z.infer<typeof trainDepartureSchema>;
+export type TrainStationBoard = z.infer<typeof trainStationBoardSchema>;
+export type TrainPayload = z.infer<typeof trainPayloadSchema>;

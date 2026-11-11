@@ -1,12 +1,13 @@
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 import { resolve } from "node:path";
-import type { DisplayPayload } from "@family-display/contract";
+import type { DisplayPayload, TrainPayload } from "@family-display/contract";
 import { DisplayDataUnavailableError } from "./display-service.js";
 
 export interface DisplayReader { getToday(): Promise<{ payload: DisplayPayload; stale: boolean }> }
+export interface TrainReader { getDepartures(): Promise<TrainPayload> }
 export interface CrestReader { loadCrest(teamId: string): Promise<{ body: Buffer; contentType: string; etag?: string } | null> }
-export async function buildServer(options: { service: DisplayReader; crests?: CrestReader; webRoot?: string }) {
+export async function buildServer(options: { service: DisplayReader; trains?: TrainReader; crests?: CrestReader; webRoot?: string }) {
   const app = Fastify({ logger: false });
   app.get("/healthz", async () => ({ status: "ok" }));
   app.get("/api/today", async (_request, reply) => {
@@ -14,6 +15,14 @@ export async function buildServer(options: { service: DisplayReader; crests?: Cr
     catch (error) {
       if (error instanceof DisplayDataUnavailableError) return reply.status(503).header("Cache-Control", "no-store").send({ error: { code: "DISPLAY_DATA_UNAVAILABLE", message: "Display data is temporarily unavailable" } });
       throw error;
+    }
+  });
+  app.get("/api/trains", async (_request, reply) => {
+    if (!options.trains) return reply.status(503).header("Cache-Control", "no-store").send({ error: { code: "TRAIN_DATA_UNAVAILABLE", message: "Train data is temporarily unavailable" } });
+    try {
+      return reply.header("Cache-Control", "no-store").send(await options.trains.getDepartures());
+    } catch {
+      return reply.status(503).header("Cache-Control", "no-store").send({ error: { code: "TRAIN_DATA_UNAVAILABLE", message: "Train data is temporarily unavailable" } });
     }
   });
   app.get<{ Params: { teamId: string } }>("/api/football/crest/:teamId", async (request, reply) => {

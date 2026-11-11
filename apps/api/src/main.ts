@@ -8,6 +8,8 @@ import { OpenMeteoProvider } from "./open-meteo-provider.js";
 import { SousMealProvider } from "./sous-meal-provider.js";
 import { MorningQuoteProvider } from "./morning-quote-provider.js";
 import { TheSportsDbFootballProvider } from "./thesportsdb-football-provider.js";
+import { RailInfoTrainProvider } from "./railinfo-train-provider.js";
+import { TrainService } from "./train-service.js";
 import { buildServer } from "./server.js";
 
 async function main() {
@@ -19,9 +21,10 @@ async function main() {
   const morningQuote = config.morningQuote ? new MorningQuoteProvider(config.morningQuote.url, config.morningQuote.token) : undefined;
   const football = new TheSportsDbFootballProvider();
   const calendars = new GoogleCalendarProvider(config.calendars, config.eventIdSalt, calendarApi);
+  const trains = new TrainService(new RailInfoTrainProvider());
   const service = new DisplayService(calendars, new OpenMeteoProvider(config.latitude, config.longitude), { calendarTtlMs: config.calendarTtlMs, weatherTtlMs: config.weatherTtlMs, mealTtlMs: config.mealTtlMs, ...(meals ? { meals } : {}), ...(morningQuote ? { morningQuote } : {}), football, countdownCalendar: calendars });
   const webRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../web/dist");
-  const app = await buildServer({ service, crests: football, webRoot });
+  const app = await buildServer({ service, trains, crests: football, webRoot });
   const shutdown = async () => { await app.close(); process.exit(0); };
   process.once("SIGINT", shutdown); process.once("SIGTERM", shutdown);
   await app.listen({ host: config.host, port: config.port });

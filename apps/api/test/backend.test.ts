@@ -412,8 +412,41 @@ describe("provider adapters", () => {
 
  describe("HTTP routes", () => {
   const payload = { generatedAt: "2026-08-27T13:00:00+01:00", timezone: "Europe/London" as const, morningQuote: null, nextMatch: null, yesterday: { date: "2026-08-26", weekday: "Wed" as const, events: [] }, days: ["2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02"].map((date, i) => ({ date, weekday: ["Thu", "Fri", "Sat", "Sun", "Mon", "Tue", "Wed"][i]!, isToday: i === 0, weather: null, events: [], meal: null })) };
+  const trainPayload = {
+    generatedAt: "2026-11-11T08:00:00Z",
+    source: { name: "railinfo" as const, attribution: "railinfo.uk · Network Rail & National Rail" as const },
+    main: { crs: "UWL" as const, station: "Upper Warlingham" as const, state: "empty" as const, checkedAt: "2026-11-11T08:00:00Z", departures: [] as [] },
+    rotating: [
+      { crs: "CDS" as const, station: "Coulsdon South" as const, state: "empty" as const, checkedAt: "2026-11-11T08:00:00Z", departures: [] as [] },
+      { crs: "WHY" as const, station: "Whyteleafe" as const, state: "empty" as const, checkedAt: "2026-11-11T08:00:00Z", departures: [] as [] },
+    ] as const,
+  };
   it("serves provider-independent health", async () => { const app = await buildServer({ service: { getToday: async () => { throw new Error("must not run"); } } }); const response = await app.inject({ method: "GET", url: "/healthz" }); expect(response.json()).toEqual({ status: "ok" }); await app.close(); });
   it("serves today with freshness and no-store headers", async () => { const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) } }); const response = await app.inject({ method: "GET", url: "/api/today" }); expect(response.statusCode).toBe(200); expect(response.headers["x-data-stale"]).toBe("false"); expect(response.headers["cache-control"]).toBe("no-store"); await app.close(); });
+  it("serves the independent train board without invoking calendar data", async () => {
+    const getToday = vi.fn(async () => { throw new Error("must not run"); });
+    const getDepartures = vi.fn(async () => trainPayload);
+    const app = await buildServer({ service: { getToday }, trains: { getDepartures } });
+    const response = await app.inject({ method: "GET", url: "/api/trains" });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["cache-control"]).toBe("no-store");
+    expect(response.json()).toEqual(trainPayload);
+    expect(getDepartures).toHaveBeenCalledOnce();
+    expect(getToday).not.toHaveBeenCalled();
+    await app.close();
+  });
+  it("returns a redacted train-only 503 without affecting the calendar route", async () => {
+    const app = await buildServer({
+      service: { getToday: async () => ({ payload, stale: false }) },
+      trains: { getDepartures: async () => { throw new Error("private rail detail"); } },
+    });
+    const trains = await app.inject({ method: "GET", url: "/api/trains" });
+    expect(trains.statusCode).toBe(503);
+    expect(trains.json()).toEqual({ error: { code: "TRAIN_DATA_UNAVAILABLE", message: "Train data is temporarily unavailable" } });
+    expect(trains.body).not.toContain("private rail detail");
+    expect((await app.inject({ method: "GET", url: "/api/today" })).statusCode).toBe(200);
+    await app.close();
+  });
   it("serves validated team crests from the local origin", async () => {
     const loadCrest = vi.fn(async () => ({ body: Buffer.from([137, 80, 78, 71]), contentType: "image/png", etag: "crest-v1" }));
     const app = await buildServer({ service: { getToday: async () => ({ payload, stale: false }) }, crests: { loadCrest } });

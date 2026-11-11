@@ -42,6 +42,12 @@ Configure exactly two calendars, Family and BAES, and retain only the Google Cal
 
 ## Optional shipped providers
 
+### RailInfo train departures
+
+The London-bound train board uses the public RailInfo JSON API and requires no local API credentials. It reads only fixed public station codes (`UWL`, `CDS` and `WHY`), applies an eight-second deadline to each station lookup, validates bounded upstream JSON and caches schema-valid results for 45 seconds. The independent `/api/trains` route is polled every 60 seconds; one failed station becomes unavailable without suppressing the other stations or calendar/weather data, and expired train data is not retained as current travel advice.
+
+RailInfo is an independent service derived from rail-industry data rather than a contractual National Rail feed. Keep the attribution visible, monitor availability and re-confirm the provider's fair-use terms before relying on it beyond this household display.
+
 ### Sous meals
 
 Set both `SOUS_MEALS_URL` and `SOUS_MEALS_TOKEN`. The endpoint is a read-only HTTPS feed for the requested seven-day date range. Family Display rejects partial configuration, redirects, credentials embedded in URLs, malformed responses, duplicate/out-of-range dates and responses over 64 KiB. Cached meals remain visible on provider failure when available; otherwise meal slots are empty while the rest of the board remains usable and is marked stale.
@@ -65,6 +71,7 @@ systemctl --user status family-display.service
 curl --fail --silent --show-error --max-time 10 http://100.72.212.14:3000/healthz
 curl --fail --silent --show-error --max-time 10 --output /dev/null http://100.72.212.14:3000/
 curl --fail --silent --show-error --max-time 20 http://100.72.212.14:3000/api/today
+curl --fail --silent --show-error --max-time 15 http://100.72.212.14:3000/api/trains
 ss -ltnp 'sport = :3000'
 ```
 
@@ -79,7 +86,8 @@ Chromium polls every five minutes and times out each display request after ten s
 Before moving the Pi to a new commit:
 
 - record the exact release commit; do not describe an unreleased branch/candidate as deployed;
-- verify `/healthz` and `/` with `curl --max-time 10`, and `/api/today` with `curl --max-time 20`, through `100.72.212.14:3000` from an authorised tailnet client;
+- verify `/healthz` and `/` with `curl --max-time 10`, `/api/today` with `curl --max-time 20`, and `/api/trains` with `curl --max-time 15`, through `100.72.212.14:3000` from an authorised tailnet client;
+- confirm `/api/trains` identifies Upper Warlingham, Coulsdon South and Whyteleafe exactly, keeps station failures isolated, and does not show expired departures as current;
 - confirm the returned payload contains Today plus six future days, separate Previous day, optional provider fields and no private source details;
 - interrupt upstream/network access and confirm the last valid board remains visible and marked stale;
 - confirm a later valid poll clears the stale marker;

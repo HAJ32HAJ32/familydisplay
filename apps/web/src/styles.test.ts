@@ -116,8 +116,8 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.future-day__summary \.meal\s*\{[^}]*grid-column:\s*1\s*\/\s*-1;/s);
   });
 
-  it("allocates nearly half the desktop height to the six future cards", () => {
-    expect(styles).toMatch(/\.display-board\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1\.15fr\)\s+minmax\(0,\s*1fr\);/s);
+  it("keeps a dedicated future row while prioritising the taller live-travel stack", () => {
+    expect(styles).toMatch(/\.display-board\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1\.6fr\)\s+minmax\(0,\s*1fr\);/s);
   });
 
   it("uses the revised TV type scale", () => {
@@ -137,6 +137,20 @@ describe("visual system", () => {
     expect(styles).toMatch(/\.next-match\s*\{[^}]*align-self:\s*stretch;[^}]*flex:\s*0\s+0\s+auto;[^}]*padding:\s*var\(--space-3\);/s);
     expect(styles).toMatch(/\.next-match__fixture\s*\{[^}]*grid-template-columns:\s*minmax\(2\.5rem,\s*1fr\)\s+minmax\(6rem,\s*auto\)\s+minmax\(2\.5rem,\s*1fr\);/s);
     expect(styles).toMatch(/\.next-match__team img\s*\{[^}]*width:\s*2\.5rem;[^}]*height:\s*2\.5rem;[^}]*object-fit:\s*contain;/s);
+  });
+
+  it("fits the two train boards as compact stationary rows beneath football", () => {
+    expect(styles).toMatch(/\.train-board\s*\{[^}]*flex:\s*0\s+0\s+auto;[^}]*overflow:\s*hidden;[^}]*padding:\s*var\(--space-2\)\s+var\(--space-3\);/s);
+    expect(styles).toMatch(/\.train-station li\s*\{[^}]*grid-template-columns:\s*3\.2rem\s+minmax\(0,\s*1fr\)\s+auto;[^}]*min-height:\s*1\.25rem;/s);
+    expect(styles).toMatch(/\.train-station li strong\s*\{[^}]*text-overflow:\s*ellipsis;[^}]*white-space:\s*nowrap;/s);
+    expect(styles).toMatch(/\.train-board > small\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/s);
+    expect(styles).not.toMatch(/\.train-(?:board|station)[^{]*\{[^}]*animation:/s);
+  });
+
+  it("hides the optional quote and gives the essential train stack enough desktop height", () => {
+    expect(styles).toMatch(/\.display-board\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*1\.6fr\)\s+minmax\(0,\s*1fr\);/s);
+    expect(styles).toMatch(/\.today-card__aside:has\(\.train-board\):has\(\.next-match\) \.morning-quote\s*\{\s*display:\s*none;/s);
+    expect(styles).toMatch(/@media \(min-width: 901px\) and \(max-height: 900px\)\s*\{[^@]*\.display-board\s*\{[^}]*grid-template-rows:\s*minmax\(0,\s*2\.4fr\)\s+minmax\(0,\s*1fr\);[^@]*\.train-board\s*\{[^}]*padding:\s*var\(--space-1\)\s+var\(--space-2\);/s);
   });
 
   it("compacts the quote only when the match card is present so the Today aside stays bounded", () => {
@@ -262,6 +276,6 @@ describe("stale warning placement", () => {
     const rule = styles.match(/\.stale-alert\s*\{[^}]*\}/s)![0];
     expect(rule).not.toMatch(/position:\s*(absolute|fixed)/);
     expect(rule).not.toMatch(/top:/);
-    expect(styles).toMatch(/\.display-board--alert\s*\{[^}]*grid-template-rows:\s*minmax\(min-content,\s*1\.15fr\)\s+minmax\(0,\s*1fr\)\s+auto;/s);
+    expect(styles).toMatch(/\.display-board--alert\s*\{[^}]*grid-template-rows:\s*minmax\(min-content,\s*1\.6fr\)\s+minmax\(0,\s*1fr\)\s+auto;/s);
   });
 });
