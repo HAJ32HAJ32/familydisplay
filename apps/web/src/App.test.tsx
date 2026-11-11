@@ -1,10 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import type { TrainPayload } from "@family-display/contract";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 import { scheduleDailyReload } from "./data/dailyReload";
+import { useTrainData } from "./data/useTrainData";
 import { payload } from "./test/fixture";
 
 vi.mock("./data/dailyReload", () => ({ scheduleDailyReload: vi.fn(() => vi.fn()) }));
+vi.mock("./data/useTrainData", () => ({ useTrainData: vi.fn(() => ({ status: "unavailable" })) }));
 
 // 08:00 on the fixture's Thursday: nursery drop-off is next and nothing has finished.
 const TEST_NOW = new Date("2026-08-27T08:00:00+01:00");
@@ -15,11 +18,38 @@ const response = (body: unknown, stale = false) =>
     headers: { "Content-Type": "application/json", "X-Data-Stale": String(stale) },
   });
 
+const trainPayload: TrainPayload = {
+  generatedAt: "2026-08-27T08:00:00+01:00",
+  source: { name: "railinfo", attribution: "railinfo.uk · Network Rail & National Rail" },
+  main: {
+    crs: "UWL", station: "Upper Warlingham", state: "available", checkedAt: "2026-08-27T08:00:00+01:00",
+    departures: [
+      { destination: "London Victoria", scheduledTime: "08:02", expectedTime: null, status: "on-time" },
+      { destination: "London Bridge", scheduledTime: "08:32", expectedTime: "08:40", status: "delayed" },
+      { destination: "Bedford Midland", scheduledTime: "09:02", expectedTime: null, status: "cancelled" },
+    ],
+  },
+  rotating: [
+    {
+      crs: "CDS", station: "Coulsdon South", state: "available", checkedAt: "2026-08-27T08:00:00+01:00",
+      departures: [
+        { destination: "Peterborough", scheduledTime: "08:06", expectedTime: null, status: "on-time" },
+        { destination: "London Victoria", scheduledTime: "08:11", expectedTime: "08:19", status: "delayed" },
+        { destination: "Bedford Midland", scheduledTime: "08:16", expectedTime: null, status: "cancelled" },
+      ],
+    },
+    {
+      crs: "WHY", station: "Whyteleafe", state: "empty", checkedAt: "2026-08-27T08:00:00+01:00", departures: [],
+    },
+  ],
+};
+
 describe("Family Display", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.useFakeTimers({ toFake: ["Date"], now: TEST_NOW });
     vi.stubGlobal("fetch", vi.fn());
+    vi.mocked(useTrainData).mockReturnValue({ status: "unavailable" });
   });
 
   afterEach(() => {
@@ -437,6 +467,52 @@ describe("Family Display", () => {
     expect(within(event).getByText(longTitle)).toBeVisible();
   });
 
+  it("renders live London-bound trains directly beneath the football card", async () => {
+    vi.mocked(useTrainData).mockReturnValue({ status: "ready", payload: trainPayload });
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+
+    const board = await screen.findByLabelText("London-bound train departures");
+    const match = screen.getByLabelText(/Next West Ham match:/);
+    expect(match.nextElementSibling).toBe(board);
+    expect(within(board).getByText("Upper Warlingham")).toBeVisible();
+    expect(within(board).getByLabelText("London Victoria, scheduled 08:02, on time")).toBeVisible();
+    expect(within(board).getByLabelText("London Bridge, scheduled 08:32, expected 08:40, delayed")).toBeVisible();
+    expect(within(board).getByLabelText("Bedford Midland, scheduled 09:02, cancelled")).toBeVisible();
+    expect(within(board).getByText("Checked 08:00")).toBeVisible();
+    expect(within(board).getByText("railinfo.uk · Network Rail & National Rail")).toBeVisible();
+  });
+
+  it("swaps the secondary station instantaneously every fifteen seconds", async () => {
+    vi.useFakeTimers({ now: TEST_NOW });
+    vi.mocked(useTrainData).mockReturnValue({ status: "ready", payload: trainPayload });
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    render(<App />);
+    await act(async () => { await Promise.resolve(); });
+
+    const board = screen.getByLabelText("London-bound train departures");
+    expect(within(board).getByText("Coulsdon South")).toBeVisible();
+    expect(within(board).queryByText("Whyteleafe")).not.toBeInTheDocument();
+
+    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+
+    expect(within(board).getByText("Whyteleafe")).toBeVisible();
+    expect(within(board).getByText("No London-bound departures listed")).toBeVisible();
+    expect(within(board).queryByText("Coulsdon South")).not.toBeInTheDocument();
+  });
+
+  it("shows explicit loading and unavailable travel states without stale departures", async () => {
+    vi.mocked(useTrainData).mockReturnValue({ status: "loading" });
+    vi.mocked(fetch).mockResolvedValueOnce(response(payload));
+    const { rerender } = render(<App />);
+    expect(await screen.findByText("Checking train times")).toBeVisible();
+
+    vi.mocked(useTrainData).mockReturnValue({ status: "unavailable" });
+    rerender(<App />);
+    expect(screen.getByText("Train times unavailable")).toBeVisible();
+    expect(screen.queryByText("London Victoria")).not.toBeInTheDocument();
+  });
+
   it("renders the next West Ham fixture directly beneath dinner with home and away crests", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(response(payload));
     render(<App />);
@@ -458,8 +534,9 @@ describe("Family Display", () => {
     render(<App />);
 
     const quote = await screen.findByRole("blockquote", { name: "Morning quote" });
-    expect(quote.previousElementSibling).toHaveClass("next-match");
-    expect(quote.previousElementSibling?.previousElementSibling).toHaveClass("meal--today");
+    expect(quote.previousElementSibling).toHaveClass("train-board");
+    expect(quote.previousElementSibling?.previousElementSibling).toHaveClass("next-match");
+    expect(quote.previousElementSibling?.previousElementSibling?.previousElementSibling).toHaveClass("meal--today");
     expect(quote).toHaveTextContent("Do the work in front of you.");
     expect(quote).toHaveTextContent("Marcus Aurelius");
     expect(quote.querySelector("cite")).toHaveTextContent(/^Marcus Aurelius$/);

@@ -4,7 +4,7 @@ These are the rules every change to Family Display must keep, plus the gate it m
 
 ## Product rules
 
-- The board is read-only and non-interactive: no editing, forms, accounts, navigation, hover-only details or carousels.
+- The board is read-only and non-interactive: no editing, forms, accounts, navigation or hover-only details. The one bounded carousel exception is the secondary train station rotation: it swaps Coulsdon South and Whyteleafe every 15 seconds with no transition or decorative animation. It remains an instantaneous content swap under `prefers-reduced-motion: reduce` because the station choice must still stay current.
 - It is built for a five-second glance from across the room. Today dominates the later days. Change the type scale in modest steps (about 10 to 15%), never so far that text clips.
 - Keep the six household colour mappings, the Family/BAES source defaults and the bundled Inter font. Event text keeps at least 7:1 contrast on its fill, and secondary metadata at least 4.5:1.
 - Event lists show every event that fits, then a `+N more` row. The board never scrolls on the TV layout and never clips text silently. Truncated text exposes its full value through an accessible label or title.

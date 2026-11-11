@@ -1,8 +1,9 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { BinReminder, Countdown, FootballMatch, Meal, MorningQuote, MultiDayEvent } from "@family-display/contract";
+import type { BinReminder, Countdown, FootballMatch, Meal, MorningQuote, MultiDayEvent, TrainStationBoard } from "@family-display/contract";
 import type { DisplayDay, DisplayPayload, EventOccurrence } from "./data/schema";
 import { scheduleDailyReload } from "./data/dailyReload";
 import { useDisplayData } from "./data/useDisplayData";
+import { useTrainData, type TrainDataState } from "./data/useTrainData";
 import { useNow, useWideLayout } from "./data/useNow";
 import { BinIcon, DetailIcon, MealIcon, OutfitIcon, WeatherIcon } from "./icons";
 
@@ -309,6 +310,72 @@ function NextMatchSummary({ match, timezone }: { match: FootballMatch; timezone:
   );
 }
 
+function trainStatusLabel(departure: TrainStationBoard["departures"][number]) {
+  if (departure.status === "cancelled") return "Cancelled";
+  if (departure.status === "delayed") return `Exp ${departure.expectedTime}`;
+  return "On time";
+}
+
+function trainAccessibleLabel(departure: TrainStationBoard["departures"][number]) {
+  if (departure.status === "cancelled") return `${departure.destination}, scheduled ${departure.scheduledTime}, cancelled`;
+  if (departure.status === "delayed") return `${departure.destination}, scheduled ${departure.scheduledTime}, expected ${departure.expectedTime}, delayed`;
+  return `${departure.destination}, scheduled ${departure.scheduledTime}, on time`;
+}
+
+function TrainStation({ board }: { board: TrainStationBoard }) {
+  return (
+    <section className="train-station" aria-label={`${board.station} London-bound departures`}>
+      <h3>{board.station}</h3>
+      {board.state === "unavailable" && <p className="train-station__state">Train times unavailable</p>}
+      {board.state === "empty" && <p className="train-station__state">No London-bound departures listed</p>}
+      {board.state === "available" && (
+        <ul>
+          {board.departures.map((departure) => (
+            <li key={`${departure.scheduledTime}-${departure.destination}`} aria-label={trainAccessibleLabel(departure)}>
+              <time>{departure.scheduledTime}</time>
+              <strong title={departure.destination}>{departure.destination}</strong>
+              <span className={`train-status train-status--${departure.status}`}>{trainStatusLabel(departure)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function TrainBoard({ state, timezone }: { state: TrainDataState; timezone: string }) {
+  const [rotatingIndex, setRotatingIndex] = useState(0);
+  const generatedAt = state.status === "ready" ? state.payload.generatedAt : null;
+  useEffect(() => {
+    setRotatingIndex(0);
+    if (!generatedAt) return;
+    const interval = setInterval(() => setRotatingIndex((index) => (index + 1) % 2), 15_000);
+    return () => clearInterval(interval);
+  }, [generatedAt]);
+
+  if (state.status !== "ready") {
+    return (
+      <section className="train-board train-board--state" aria-label="London-bound train departures">
+        <p className="eyebrow">London-bound trains</p>
+        <p>{state.status === "loading" ? "Checking train times" : "Train times unavailable"}</p>
+      </section>
+    );
+  }
+
+  const checked = clockTime(new Date(state.payload.main.checkedAt), timezone);
+  return (
+    <section className="train-board" aria-label="London-bound train departures">
+      <div className="train-board__header">
+        <p className="eyebrow">London-bound trains</p>
+        <span>Checked {checked}</span>
+      </div>
+      <TrainStation board={state.payload.main} />
+      <TrainStation board={state.payload.rotating[rotatingIndex]!} />
+      <small title={state.payload.source.attribution}>{state.payload.source.attribution}</small>
+    </section>
+  );
+}
+
 const binLabels = { recycling: "Recycling", general: "General waste" } as const;
 
 function BinReminderSummary({ reminder, timezone }: { reminder: BinReminder; timezone: string }) {
@@ -380,7 +447,7 @@ function DayPanel({ day, timezone, now }: { day: DisplayDay; timezone: string; n
   );
 }
 
-function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
+function TodayCard({ payload, now, trains }: { payload: DisplayPayload; now: Date; trains: TrainDataState }) {
   const day = payload.days[0]!;
   const timezone = payload.timezone;
   const schedule = todaySchedule(payload, now);
@@ -397,6 +464,7 @@ function TodayCard({ payload, now }: { payload: DisplayPayload; now: Date }) {
         {payload.binReminder && <BinReminderSummary reminder={payload.binReminder} timezone={timezone} />}
         <MealSummary meal={day.meal} today />
         {payload.nextMatch && <NextMatchSummary match={payload.nextMatch} timezone={timezone} />}
+        <TrainBoard state={trains} timezone={timezone} />
         {payload.morningQuote && <MorningQuoteSummary quote={payload.morningQuote} />}
       </div>
     </section>
@@ -574,7 +642,7 @@ function YesterdayPanel({ payload }: { payload: DisplayPayload }) {
   );
 }
 
-function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: boolean }) {
+function DisplayBoard({ payload, stale, trains }: { payload: DisplayPayload; stale: boolean; trains: TrainDataState }) {
   const now = useNow();
   const wide = useWideLayout();
   const alert = needsStaleAlert(payload, now);
@@ -582,7 +650,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
     <main className={`display-board${alert ? " display-board--alert" : ""}`}>
       <div className="top-row">
         <DayPanel day={payload.days[0]!} timezone={payload.timezone} now={now} />
-        <TodayCard payload={payload} now={now} />
+        <TodayCard payload={payload} now={now} trains={trains} />
         <div className="top-row__rail">
           <section className="rail-card">
             <ColourGuide payload={payload} stale={stale} />
@@ -599,6 +667,7 @@ function DisplayBoard({ payload, stale }: { payload: DisplayPayload; stale: bool
 
 export function App() {
   const state = useDisplayData();
+  const trains = useTrainData();
   useEffect(() => {
     const cancel = scheduleDailyReload();
     return cancel;
@@ -613,5 +682,5 @@ export function App() {
     </main>
   );
   if (state.status === "unavailable") return <main className="app-shell app-shell--unavailable"><h1>Calendar temporarily unavailable</h1><p role="status">Trying again…</p></main>;
-  return <div className="app-shell"><DisplayBoard payload={state.payload} stale={state.stale} /></div>;
+  return <div className="app-shell"><DisplayBoard payload={state.payload} stale={state.stale} trains={trains} /></div>;
 }
